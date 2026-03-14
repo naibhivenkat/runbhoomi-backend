@@ -2,11 +2,13 @@ name: RunBhoomi Backend CI
 
 on:
   push:
-    paths:
-      - "runbhoomi_backend/**"
+     branches: "**"
   pull_request:
-    paths:
-      - "runbhoomi_backend/**"
+   branches: "**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -31,6 +33,6 @@ jobs:
         run: |
           echo "Add pytest tests later"
 
-      - name: Build Docker Image
-        run: |
-          docker build -t runbhoomi-backend ./runbhoomi_backend
+#      - name: Build Docker Image
+#        run: |
+#          docker build -t runbhoomi-backend ./runbhoomi_backend
