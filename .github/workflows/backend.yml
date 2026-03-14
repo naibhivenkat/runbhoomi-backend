@@ -17,10 +17,7 @@ jobs:
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
-
-      - name: Show repo structure
-        run: ls -R
-
+        
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
