@@ -22,7 +22,10 @@ router = APIRouter(prefix="/auth")
 
 @router.post("/player_register")
 def create_player(data: dict, db: Session = Depends(get_db)):
-    existing = db.query(models.Player).filter(models.Player.email == data["email"]).first()
+
+    existing = db.query(models.Player).filter(
+        models.Player.email == data["email"]
+    ).first()
 
     if existing:
         return {"error": "Email already registered"}
@@ -30,17 +33,20 @@ def create_player(data: dict, db: Session = Depends(get_db)):
     hashed_pw = hash_password(data["password"])
 
     player = models.Player(
+
         name=data["name"],
         phone=data["phone"],
         email=data["email"],
-        city=data["city"],
-        role=data["role"],
-        batting_style=data["batting_style"],
-        bowling_style=data["bowling_style"],
-        experience=int(data["experience"]),
-        jersey_number=int(data["jersey_number"]),
-        dob=datetime.fromisoformat(data["dob"]).date(),
+        city=data.get("city"),
+        role=data.get("role"),
+        batting_style=data.get("batting_style"),
+        bowling_style=data.get("bowling_style"),
+        experience=int(data.get("experience", 0)),
+        jersey_number=int(data.get("jersey_number", 0)),
+        dob=datetime.fromisoformat(data["dob"]).date()
+            if data.get("dob") else None,
         password_hash=hashed_pw
+
     )
 
     db.add(player)
