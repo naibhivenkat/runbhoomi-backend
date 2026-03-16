@@ -1,4 +1,4 @@
-from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime, Date
+from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime, Date, BigInteger
 from datetime import datetime
 from app.database.db import Base
 
@@ -59,3 +59,11 @@ class Player(Base):
     password_hash = Column(String)
     profile_photo = Column(String)   # optional
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class EmailOTP(Base):
+    __tablename__ = "email_otp"
+
+    email = Column(String, primary_key=True, index=True)
+    otp = Column(String, nullable=False)
+    expiry = Column(BigInteger, nullable=False)
+    attempts = Column(Integer, default=0)
