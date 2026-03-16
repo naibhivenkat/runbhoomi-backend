@@ -57,10 +57,14 @@ def create_player(data: dict, db: Session = Depends(get_db)):
 
 @router.post("/send_otp")
 def send_otp(data: dict, db: Session = Depends(get_db)):
+
     email = data.get("email")
 
     if not email:
-        return {"status": "error", "message": "Email required"}
+        return {
+            "status": "error",
+            "message": "Email required"
+        }
 
     otp = generate_otp()
 
@@ -69,7 +73,7 @@ def send_otp(data: dict, db: Session = Depends(get_db)):
     if send_email_otp(email, otp):
         return {
             "status": "success",
-            "message": "OTP sent to email"
+            "message": "OTP sent successfully"
         }
 
     return {

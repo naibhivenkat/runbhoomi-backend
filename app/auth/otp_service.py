@@ -4,7 +4,9 @@ import time
 from sqlalchemy.orm import Session
 from app.database import models
 import requests
+import logging
 
+logger = logging.getLogger(__name__)
 
 SENDINBLUE_API_KEY = os.getenv("SENDINBLUE_API_KEY")
 FROM_EMAIL = os.getenv("FROM_EMAIL")
@@ -56,29 +58,54 @@ def increment_attempt(db: Session, record):
 
 def send_email_otp(email, otp):
 
-    url = "https://api.brevo.com/v3/smtp/email"
+    try:
 
-    payload = {
-        "sender": {
-            "name": "RunBhoomi",
-            "email": FROM_EMAIL
-        },
-        "to": [{"email": email}],
-        "subject": "RunBhoomi OTP Verification",
-        "htmlContent": f"""
-        <h2>RunBhoomi Email Verification</h2>
-        <p>Your OTP is:</p>
-        <h1>{otp}</h1>
-        <p>OTP expires in 2 minutes.</p>
+
+        logger.info(f"SENDINBLUE_API_KEY: {SENDINBLUE_API_KEY}")
+        logger.info(f"FROM_EMAIL: {FROM_EMAIL}")
+
+        url = "https://api.sendinblue.com/v3/smtp/email"
+
+        headers = {
+            "api-key": SENDINBLUE_API_KEY,
+            "Content-Type": "application/json"
+        }
+
+        subject = "RunBhoomi Email Verification"
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; padding:20px;">
+            <h2>RunBhoomi Verification</h2>
+            <p>Your OTP is:</p>
+
+            <div style="background:#f4f4f4;padding:20px;border-radius:8px;text-align:center;">
+                <h1 style="letter-spacing:6px;">{otp}</h1>
+            </div>
+
+            <p>This OTP is valid for 2 minutes.</p>
+
+            <p>If you didn't request this, ignore this email.</p>
+        </div>
         """
-    }
 
-    headers = {
-        "accept": "application/json",
-        "api-key": SENDINBLUE_API_KEY,
-        "content-type": "application/json"
-    }
+        data = {
+            "sender": {
+                "name": "RunBhoomi",
+                "email": FROM_EMAIL
+            },
+            "to": [{"email": email}],
+            "subject": subject,
+            "htmlContent": html_content
+        }
 
-    r = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, headers=headers, json=data)
 
-    return r.status_code == 201
+        logger.info(f"[BREVO RESPONSE] {response.status_code} {response.text}")
+
+        return response.status_code in (200, 201)
+
+    except Exception as e:
+
+        logger.error(f"OTP email send failed: {e}")
+
+        return False
