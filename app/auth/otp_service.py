@@ -57,55 +57,29 @@ def increment_attempt(db: Session, record):
     db.commit()
 
 def send_email_otp(email, otp):
+    print("API KEY:", SENDINBLUE_API_KEY)
+    print("FROM EMAIL:", FROM_EMAIL)
 
-    try:
+    url = "https://api.sendinblue.com/v3/smtp/email"
 
+    headers = {
+        "api-key": SENDINBLUE_API_KEY,
+        "Content-Type": "application/json"
+    }
 
-        logger.info(f"SENDINBLUE_API_KEY: {SENDINBLUE_API_KEY}")
-        logger.info(f"FROM_EMAIL: {FROM_EMAIL}")
+    data = {
+        "sender": {
+            "name": "RunBhoomi",
+            "email": FROM_EMAIL
+        },
+        "to": [{"email": email}],
+        "subject": "RunBhoomi OTP Verification",
+        "htmlContent": f"<h2>Your OTP is {otp}</h2>"
+    }
 
-        url = "https://api.sendinblue.com/v3/smtp/email"
+    response = requests.post(url, headers=headers, json=data)
 
-        headers = {
-            "api-key": SENDINBLUE_API_KEY,
-            "Content-Type": "application/json"
-        }
+    print("BREVO STATUS:", response.status_code)
+    print("BREVO RESPONSE:", response.text)
 
-        subject = "RunBhoomi Email Verification"
-
-        html_content = f"""
-        <div style="font-family: Arial, sans-serif; padding:20px;">
-            <h2>RunBhoomi Verification</h2>
-            <p>Your OTP is:</p>
-
-            <div style="background:#f4f4f4;padding:20px;border-radius:8px;text-align:center;">
-                <h1 style="letter-spacing:6px;">{otp}</h1>
-            </div>
-
-            <p>This OTP is valid for 2 minutes.</p>
-
-            <p>If you didn't request this, ignore this email.</p>
-        </div>
-        """
-
-        data = {
-            "sender": {
-                "name": "RunBhoomi",
-                "email": FROM_EMAIL
-            },
-            "to": [{"email": email}],
-            "subject": subject,
-            "htmlContent": html_content
-        }
-
-        response = requests.post(url, headers=headers, json=data)
-
-        logger.info(f"[BREVO RESPONSE] {response.status_code} {response.text}")
-
-        return response.status_code in (200, 201)
-
-    except Exception as e:
-
-        logger.error(f"OTP email send failed: {e}")
-
-        return False
+    return response.status_code in (200, 201)
