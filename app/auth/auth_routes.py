@@ -10,18 +10,18 @@ from app.auth.otp_service import (
     save_otp,
     get_otp,
     delete_otp,
-    increment_attempt
+    increment_attempt,
+    send_email_otp
 )
 from app.database import models
 from app.database.db import get_db
 from app.utls.password_utils import hash_password
 
-router=APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth")
 
 
 @router.post("/player_register")
 def create_player(data: dict, db: Session = Depends(get_db)):
-
     existing = db.query(models.Player).filter(models.Player.email == data["email"]).first()
 
     if existing:
@@ -54,9 +54,9 @@ def create_player(data: dict, db: Session = Depends(get_db)):
         "token": token
     }
 
+
 @router.post("/send_otp")
 def send_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email")
 
     if not email:
@@ -66,18 +66,20 @@ def send_otp(data: dict, db: Session = Depends(get_db)):
 
     save_otp(db, email, otp)
 
-    # TODO send email here
-    print("OTP:", otp)
+    if send_email_otp(email, otp):
+        return {
+            "status": "success",
+            "message": "OTP sent to email"
+        }
 
     return {
-        "status": "success",
-        "message": "OTP sent"
+        "status": "error",
+        "message": "Failed to send OTP"
     }
 
 
 @router.post("/verify_otp")
 def verify_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email")
     otp_input = str(data.get("otp"))
 
@@ -93,7 +95,6 @@ def verify_otp(data: dict, db: Session = Depends(get_db)):
         return {"status": "error", "message": "OTP expired"}
 
     if record.otp == otp_input:
-
         delete_otp(db, email)
 
         return {
@@ -108,10 +109,11 @@ def verify_otp(data: dict, db: Session = Depends(get_db)):
         "message": "Invalid OTP"
     }
 
+
 @router.post("/login")
-def login(email:str,password:str,db:Session=Depends(get_db)):
-    user=db.query(models.User).filter(models.User.email==email).first()
+def login(email: str, password: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
-        return {"error":"user not found"}
-    token=create_token(user.id)
-    return {"token":token}
+        return {"error": "user not found"}
+    token = create_token(user.id)
+    return {"token": token}

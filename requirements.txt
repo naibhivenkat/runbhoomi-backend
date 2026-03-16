@@ -10,3 +10,4 @@ celery
 python-dotenv
 websockets
 gunicorn
+requests

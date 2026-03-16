@@ -1,8 +1,13 @@
+import os
 import random
 import time
 from sqlalchemy.orm import Session
 from app.database import models
+import requests
 
+
+SENDINBLUE_API_KEY = os.getenv("SENDINBLUE_API_KEY")
+FROM_EMAIL = os.getenv("FROM_EMAIL")
 
 def generate_otp():
     return str(random.randint(100000, 999999))
@@ -48,3 +53,32 @@ def increment_attempt(db: Session, record):
 
     record.attempts += 1
     db.commit()
+
+def send_email_otp(email, otp):
+
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    payload = {
+        "sender": {
+            "name": "RunBhoomi",
+            "email": FROM_EMAIL
+        },
+        "to": [{"email": email}],
+        "subject": "RunBhoomi OTP Verification",
+        "htmlContent": f"""
+        <h2>RunBhoomi Email Verification</h2>
+        <p>Your OTP is:</p>
+        <h1>{otp}</h1>
+        <p>OTP expires in 2 minutes.</p>
+        """
+    }
+
+    headers = {
+        "accept": "application/json",
+        "api-key": SENDINBLUE_API_KEY,
+        "content-type": "application/json"
+    }
+
+    r = requests.post(url, json=payload, headers=headers)
+
+    return r.status_code == 201
