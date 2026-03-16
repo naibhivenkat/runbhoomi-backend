@@ -55,3 +55,7 @@ class Player(Base):
     jersey_number = Column(Integer)
 
     dob = Column(Date)
+
+    password_hash = Column(String)
+    profile_photo = Column(String)   # optional
+    created_at = Column(DateTime, default=datetime.utcnow)
