@@ -1,4 +1,4 @@
-from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime
+from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime, Date
 from datetime import datetime
 from app.database.db import Base
 
@@ -34,3 +34,24 @@ class Ball(Base):
     pitch_x=Column(Float)
     pitch_y=Column(Float)
     created_at=Column(DateTime,default=datetime.utcnow)
+
+
+class Player(Base):
+    __tablename__ = "players"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    name = Column(String)
+    phone = Column(String)
+    email = Column(String)
+
+    city = Column(String)
+    role = Column(String)
+
+    batting_style = Column(String)
+    bowling_style = Column(String)
+
+    experience = Column(Integer)
+    jersey_number = Column(Integer)
+
+    dob = Column(Date)
