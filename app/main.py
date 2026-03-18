@@ -32,12 +32,8 @@
 #     return {"status": "ok"}
 
 
-
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-
-from app.database.db import engine
-from app.database.models import Base
 
 from app.auth.auth_routes import router as auth_router
 from app.matches.match_routes import router as match_router
@@ -47,17 +43,21 @@ from app.tournaments.tournament_routes import router as tournament_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    print("🚀 App starting...")
+
     try:
-        print("🔥 Starting DB connection...")
+        # ✅ Import DB ONLY at runtime
+        from app.database.db import engine
+        from app.database.models import Base
+
+        print("🔥 Connecting to DB...")
         Base.metadata.create_all(bind=engine)
-        print("✅ DB Connected & Tables Created")
+        print("✅ DB Connected")
     except Exception as e:
-        print("❌ DB ERROR:", str(e))
+        print("❌ DB ERROR:", e)
 
-    yield  # <-- App runs here
+    yield
 
-    # Shutdown (optional)
     print("🛑 App shutting down...")
 
 
