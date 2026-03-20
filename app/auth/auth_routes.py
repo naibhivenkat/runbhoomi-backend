@@ -15,12 +15,14 @@ from app.auth.otp_service import (
     get_otp,
     delete_otp,
     increment_attempt,
-    send_email_otp
+    send_email_otp,
+    send_email_login_otp
 )
 from app.database import models
 from app.database.db import get_db
 from app.utls.password_utils import hash_password
 from app.utls.password_utils import verify_password
+
 router = APIRouter(prefix="/auth")
 
 GOOGLE_CLIENT_ID = "830296224047-c6mftjed5a6ld7c6oa9k72rpeurgvfo5.apps.googleusercontent.com"
@@ -33,7 +35,6 @@ class GoogleAuthRequest(BaseModel):
 
 @router.post("/player_register")
 def create_player(data: dict, db: Session = Depends(get_db)):
-
     if not data.get("email") or not data.get("password"):
         return {"status": "error", "message": "Missing required fields"}
 
@@ -58,7 +59,7 @@ def create_player(data: dict, db: Session = Depends(get_db)):
         experience=int(data.get("experience", 0)),
         jersey_number=int(data.get("jersey_number", 0)),
         dob=datetime.fromisoformat(data["dob"]).date()
-            if data.get("dob") else None,
+        if data.get("dob") else None,
         password_hash=hashed_pw,
         profile_photo=data.get("profile_photo"),
     )
@@ -78,7 +79,6 @@ def create_player(data: dict, db: Session = Depends(get_db)):
 
 @router.post("/send_otp")
 def send_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email")
 
     if not email:
@@ -137,7 +137,6 @@ def verify_otp(data: dict, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(data: dict = Body(...), db: Session = Depends(get_db)):
-
     email = data.get("email")
     password = data.get("password")
 
@@ -163,50 +162,84 @@ def login(data: dict = Body(...), db: Session = Depends(get_db)):
         "status": "success",
         "token": token
     }
+
+
 @router.post("/login-otp")
 def login_otp(data: dict, db: Session = Depends(get_db)):
 
-    email = data.get("email")
+    email = data.get("email", "").lower().strip()
+
+    if not email:
+        return {"status": "error", "message": "Email required"}
 
     user = db.query(models.Player).filter(
         models.Player.email == email
     ).first()
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        return {"status": "error", "message": "User not found"}
+
+    # 🔥 prevent spam
+    record = get_otp(db, email)
+    if record and int(time.time()) < record.expiry - 60:
+        return {
+            "status": "error",
+            "message": "Wait before requesting new OTP"
+        }
 
     otp = generate_otp()
     save_otp(db, email, otp)
 
-    send_email_otp(email, otp)
+    if send_email_otp(email, otp, subject="RunBhoomi Login OTP", is_login=True):
+        return {"status": "success", "message": "OTP sent"}
 
-    return {"status": "success", "message": "OTP sent"}
+    return {"status": "error", "message": "Failed to send OTP"}
+
 
 @router.post("/verify-login-otp")
 def verify_login_otp(data: dict, db: Session = Depends(get_db)):
 
-    email = data.get("email")
+    email = data.get("email", "").lower().strip()
     otp_input = str(data.get("otp"))
+
+    if not email or not otp_input:
+        return {"status": "error", "message": "Email and OTP required"}
 
     record = get_otp(db, email)
 
     if not record:
-        raise HTTPException(status_code=400, detail="No OTP")
+        return {"status": "error", "message": "No OTP sent"}
+
+    if record.attempts >= 5:
+        return {"status": "error", "message": "Too many attempts"}
+
+    if int(time.time()) > record.expiry:
+        return {"status": "error", "message": "OTP expired"}
 
     if record.otp != otp_input:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
+        increment_attempt(db, record)
+        return {"status": "error", "message": "Invalid OTP"}
+
+    delete_otp(db, email)
 
     user = db.query(models.Player).filter(
         models.Player.email == email
     ).first()
 
-    token = create_token(user.id)
+    if not user:
+        return {"status": "error", "message": "User not found"}
 
-    delete_otp(db, email)
+    token = create_token(user.id)
 
     return {
         "status": "success",
-        "token": token
+        "message": "Login successful",
+        "token": token,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name
+        }
     }
 
 
