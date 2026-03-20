@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from fastapi import Depends
 from google.auth.transport import requests
 from google.oauth2 import id_token
@@ -20,7 +20,7 @@ from app.auth.otp_service import (
 from app.database import models
 from app.database.db import get_db
 from app.utls.password_utils import hash_password
-
+from app.utls.password_utils import verify_password
 router = APIRouter(prefix="/auth")
 
 GOOGLE_CLIENT_ID = "830296224047-c6mftjed5a6ld7c6oa9k72rpeurgvfo5.apps.googleusercontent.com"
@@ -136,12 +136,78 @@ def verify_otp(data: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(email: str, password: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.email == email).first()
+def login(data: dict = Body(...), db: Session = Depends(get_db)):
+
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        raise HTTPException(status_code=400, detail="Email & password required")
+
+    user = db.query(models.Player).filter(
+        models.Player.email == email
+    ).first()
+
     if not user:
-        return {"error": "user not found"}
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.password_hash:
+        raise HTTPException(status_code=400, detail="Use Google login")
+
+    if not verify_password(password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid password")
+
     token = create_token(user.id)
-    return {"token": token}
+
+    return {
+        "status": "success",
+        "token": token
+    }
+@router.post("/login-otp")
+def login_otp(data: dict, db: Session = Depends(get_db)):
+
+    email = data.get("email")
+
+    user = db.query(models.Player).filter(
+        models.Player.email == email
+    ).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    otp = generate_otp()
+    save_otp(db, email, otp)
+
+    send_email_otp(email, otp)
+
+    return {"status": "success", "message": "OTP sent"}
+
+@router.post("/verify-login-otp")
+def verify_login_otp(data: dict, db: Session = Depends(get_db)):
+
+    email = data.get("email")
+    otp_input = str(data.get("otp"))
+
+    record = get_otp(db, email)
+
+    if not record:
+        raise HTTPException(status_code=400, detail="No OTP")
+
+    if record.otp != otp_input:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    user = db.query(models.Player).filter(
+        models.Player.email == email
+    ).first()
+
+    token = create_token(user.id)
+
+    delete_otp(db, email)
+
+    return {
+        "status": "success",
+        "token": token
+    }
 
 
 @router.post("/google")
