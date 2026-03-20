@@ -41,23 +41,25 @@ class Player(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    name = Column(String)
-    phone = Column(String)
-    email = Column(String)
+    name = Column(String(100), nullable=False)
+    phone = Column(String(15), nullable=False)
+    email = Column(String(120), unique=True, index=True, nullable=False)
+    gender = Column(String(10), nullable=True)
 
-    city = Column(String)
-    role = Column(String)
+    city = Column(String, nullable=True, index=True)
+    role = Column(String, nullable=True, index=True)
 
-    batting_style = Column(String)
-    bowling_style = Column(String)
+    batting_style = Column(String, nullable=True)
+    bowling_style = Column(String, nullable=True)
 
-    experience = Column(Integer)
-    jersey_number = Column(Integer)
+    experience = Column(Integer, default=0)
+    jersey_number = Column(Integer, default=0)
 
-    dob = Column(Date)
+    dob = Column(Date, nullable=True)
 
-    password_hash = Column(String)
-    profile_photo = Column(String)   # optional
+    password_hash = Column(String, nullable=False)
+    profile_photo = Column(String, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class EmailOTP(Base):

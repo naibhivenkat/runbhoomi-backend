@@ -23,31 +23,33 @@ router = APIRouter(prefix="/auth")
 @router.post("/player_register")
 def create_player(data: dict, db: Session = Depends(get_db)):
 
+    if not data.get("email") or not data.get("password"):
+        return {"status": "error", "message": "Missing required fields"}
+
     existing = db.query(models.Player).filter(
         models.Player.email == data["email"]
     ).first()
 
     if existing:
-        return {"error": "Email already registered"}
+        return {"status": "error", "message": "Email already registered"}
 
     hashed_pw = hash_password(data["password"])
 
     player = models.Player(
-
         name=data["name"],
         phone=data["phone"],
         email=data["email"],
+        gender=data.get("gender"),
         city=data.get("city"),
         role=data.get("role"),
-        gender=data.get("gender"),
         batting_style=data.get("batting_style"),
         bowling_style=data.get("bowling_style"),
         experience=int(data.get("experience", 0)),
         jersey_number=int(data.get("jersey_number", 0)),
         dob=datetime.fromisoformat(data["dob"]).date()
             if data.get("dob") else None,
-        password_hash=hashed_pw
-
+        password_hash=hashed_pw,
+        profile_photo=data.get("profile_photo"),
     )
 
     db.add(player)
@@ -57,6 +59,7 @@ def create_player(data: dict, db: Session = Depends(get_db)):
     token = create_token(player.id)
 
     return {
+        "status": "success",
         "message": "player created",
         "token": token
     }
