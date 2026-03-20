@@ -47,10 +47,10 @@ app.include_router(scoring_router)
 app.include_router(tournament_router)
 
 # Routes
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def home():
-    return {"status": "RunBhoomi backend running"}
+    return {"status": "✅ Run Bhoomi backend running 🚀 "}
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health():
-    return {"status": "ok"}
+    return {"status": "🚀 Backend is Healthy ✅✅"}
