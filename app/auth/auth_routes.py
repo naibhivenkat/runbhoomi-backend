@@ -23,10 +23,14 @@ from app.utls.password_utils import hash_password
 
 router = APIRouter(prefix="/auth")
 
-GOOGLE_CLIENT_ID = "YOUR_WEB_CLIENT_ID"
+GOOGLE_CLIENT_ID = "830296224047-c6mftjed5a6ld7c6oa9k72rpeurgvfo5.apps.googleusercontent.com"
 JWT_SECRET = "your_secret_key"
+
+
 class GoogleAuthRequest(BaseModel):
     idToken: str
+
+
 @router.post("/player_register")
 def create_player(data: dict, db: Session = Depends(get_db)):
 
