@@ -39,6 +39,7 @@ def create_player(data: dict, db: Session = Depends(get_db)):
         email=data["email"],
         city=data.get("city"),
         role=data.get("role"),
+        gender=data.get("gender"),
         batting_style=data.get("batting_style"),
         bowling_style=data.get("bowling_style"),
         experience=int(data.get("experience", 0)),
