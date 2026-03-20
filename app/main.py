@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-
+from fastapi.middleware.cors import CORSMiddleware
 from app.auth.auth_routes import router as auth_router
 from app.matches.match_routes import router as match_router
 from app.matches.scoring_routes import router as scoring_router
@@ -30,6 +30,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="RunBhoomi API",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Routers
