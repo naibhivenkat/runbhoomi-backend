@@ -330,20 +330,19 @@ def verify_forgot_otp(data: dict, db: Session = Depends(get_db)):
     record = get_otp(db, email)
 
     if not record:
-        return {"status": "error", "message": "No OTP"}
+        raise HTTPException(status_code=400, detail="No OTP")
 
     if record.attempts >= 5:
-        return {"status": "error", "message": "Too many attempts"}
+        raise HTTPException(status_code=400, detail="Too many attempts")
 
     if int(time.time()) > record.expiry:
-        return {"status": "error", "message": "OTP expired"}
+        raise HTTPException(status_code=400, detail="OTP expired")
 
     if record.otp != otp_input:
         increment_attempt(db, record)
-        return {"status": "error", "message": "Invalid OTP"}
+        raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    return {"status": "success", "message": "OTP verified"}
-
+    return {"status": "success"}
 
 @router.post("/reset-password")
 def reset_password(data: dict, db: Session = Depends(get_db)):
