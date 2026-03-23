@@ -15,8 +15,7 @@ from app.auth.otp_service import (
     get_otp,
     delete_otp,
     increment_attempt,
-    send_email_otp,
-    send_email_login_otp
+    send_email_otp
 )
 from app.database import models
 from app.database.db import get_db
@@ -297,3 +296,75 @@ def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
     except Exception as e:
         print("Google Auth Error:", e)
         raise HTTPException(status_code=401, detail="Invalid Google token")
+
+
+@router.post("/forgot-password-otp")
+def forgot_password_otp(data: dict, db: Session = Depends(get_db)):
+
+    email = data.get("email", "").lower().strip()
+
+    if not email:
+        return {"status": "error", "message": "Email required"}
+
+    user = db.query(models.Player).filter(
+        models.Player.email == email
+    ).first()
+
+    if not user:
+        return {"status": "error", "message": "User not found"}
+
+    otp = generate_otp()
+    save_otp(db, email, otp)
+
+    send_email_otp(email, otp, subject="Reset Password OTP")
+
+    return {"status": "success", "message": "OTP sent"}
+
+
+@router.post("/verify-forgot-otp")
+def verify_forgot_otp(data: dict, db: Session = Depends(get_db)):
+
+    email = data.get("email", "").lower().strip()
+    otp_input = str(data.get("otp"))
+
+    record = get_otp(db, email)
+
+    if not record:
+        return {"status": "error", "message": "No OTP"}
+
+    if record.attempts >= 5:
+        return {"status": "error", "message": "Too many attempts"}
+
+    if int(time.time()) > record.expiry:
+        return {"status": "error", "message": "OTP expired"}
+
+    if record.otp != otp_input:
+        increment_attempt(db, record)
+        return {"status": "error", "message": "Invalid OTP"}
+
+    return {"status": "success", "message": "OTP verified"}
+
+
+@router.post("/reset-password")
+def reset_password(data: dict, db: Session = Depends(get_db)):
+
+    email = data.get("email", "").lower().strip()
+    new_password = data.get("password")
+
+    if not email or not new_password:
+        return {"status": "error", "message": "Missing data"}
+
+    user = db.query(models.Player).filter(
+        models.Player.email == email
+    ).first()
+
+    if not user:
+        return {"status": "error", "message": "User not found"}
+
+    user.password_hash = hash_password(new_password)
+
+    delete_otp(db, email)
+
+    db.commit()
+
+    return {"status": "success", "message": "Password reset successful"}
