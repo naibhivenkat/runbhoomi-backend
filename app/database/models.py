@@ -1,4 +1,4 @@
-from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime, Date, BigInteger
+from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime, Date, BigInteger, ForeignKey
 from datetime import datetime
 from app.database.db import Base
 
@@ -59,6 +59,7 @@ class Player(Base):
 
     password_hash = Column(String, nullable=False)
     profile_photo = Column(String, nullable=True)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
