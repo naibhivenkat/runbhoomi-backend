@@ -362,6 +362,6 @@ def reset_password(data: dict, db: Session = Depends(get_db)):
     delete_otp(db, email)
 
     db.commit()
-    send_confirmation_email(email, subject="Confirmation Email")
+    send_confirmation_email(email)
 
     return {"status": "success", "message": "Password reset successful"}
