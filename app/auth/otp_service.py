@@ -106,7 +106,6 @@
 #     return response.status_code in (200, 201)
 
 
-
 import os
 import random
 import time
@@ -128,7 +127,6 @@ def generate_otp():
 
 # 🔹 SAVE OTP (CREATE OR UPDATE)
 def save_otp(db: Session, email: str, otp: str):
-
     email = email.lower().strip()
     expiry = int(time.time()) + 120  # 2 mins
 
@@ -181,7 +179,6 @@ def increment_attempt(db: Session, record):
 
 # 🔥 SINGLE EMAIL SENDER (REUSABLE)
 def send_email_otp(email, otp, subject="RunBhoomi OTP", is_login=False):
-
     email = email.lower().strip()
 
     if not SENDINBLUE_API_KEY or not FROM_EMAIL:
@@ -210,6 +207,56 @@ def send_email_otp(email, otp, subject="RunBhoomi OTP", is_login=False):
         <h1>{otp}</h1>
         <p>This OTP is valid for 2 minutes.</p>
         """
+
+    data = {
+        "sender": {
+            "name": "RunBhoomi",
+            "email": FROM_EMAIL
+        },
+        "to": [{"email": email}],
+        "subject": subject,
+        "htmlContent": html
+    }
+
+    try:
+        response = requests.post(
+            url,
+            headers=headers,
+            json=data,
+            timeout=10  # 🔥 prevent hanging
+        )
+
+        logger.info(f"Email status: {response.status_code}")
+        logger.debug(f"Email response: {response.text}")
+
+        return response.status_code in (200, 201)
+
+    except Exception as e:
+        logger.error(f"Email sending failed: {e}")
+        return False
+
+
+def send_confirmation_email(email, subject="Confirmation Email"):
+    email = email.lower().strip()
+
+    if not SENDINBLUE_API_KEY or not FROM_EMAIL:
+        logger.error("Email config missing")
+        return False
+
+    url = "https://api.sendinblue.com/v3/smtp/email"
+
+    text = "Your Login Password is Changed"
+
+    headers = {
+        "api-key": SENDINBLUE_API_KEY,
+        "Content-Type": "application/json"
+    }
+    html = f"""
+    <h2>RunBhoomi Confirmation Email</h2>
+    <p>Your OTP is:</p>
+    <h1>{text}</h1>
+    <p>Note : If your are  not changed please contact Support Team Thank You</p>
+    """
 
     data = {
         "sender": {

@@ -15,7 +15,8 @@ from app.auth.otp_service import (
     get_otp,
     delete_otp,
     increment_attempt,
-    send_email_otp
+    send_email_otp,
+    send_confirmation_email
 )
 from app.database import models
 from app.database.db import get_db
@@ -165,7 +166,6 @@ def login(data: dict = Body(...), db: Session = Depends(get_db)):
 
 @router.post("/login-otp")
 def login_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email", "").lower().strip()
 
     if not email:
@@ -197,7 +197,6 @@ def login_otp(data: dict, db: Session = Depends(get_db)):
 
 @router.post("/verify-login-otp")
 def verify_login_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email", "").lower().strip()
     otp_input = str(data.get("otp"))
 
@@ -300,7 +299,6 @@ def google_auth(data: GoogleAuthRequest, db: Session = Depends(get_db)):
 
 @router.post("/forgot-password-otp")
 def forgot_password_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email", "").lower().strip()
 
     if not email:
@@ -323,7 +321,6 @@ def forgot_password_otp(data: dict, db: Session = Depends(get_db)):
 
 @router.post("/verify-forgot-otp")
 def verify_forgot_otp(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email", "").lower().strip()
     otp_input = str(data.get("otp"))
 
@@ -344,9 +341,9 @@ def verify_forgot_otp(data: dict, db: Session = Depends(get_db)):
 
     return {"status": "success"}
 
+
 @router.post("/reset-password")
 def reset_password(data: dict, db: Session = Depends(get_db)):
-
     email = data.get("email", "").lower().strip()
     new_password = data.get("password")
 
@@ -365,5 +362,6 @@ def reset_password(data: dict, db: Session = Depends(get_db)):
     delete_otp(db, email)
 
     db.commit()
+    send_confirmation_email(email, subject="Confirmation Email")
 
     return {"status": "success", "message": "Password reset successful"}
