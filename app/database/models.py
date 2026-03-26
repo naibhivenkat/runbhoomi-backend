@@ -15,13 +15,25 @@ class Team(Base):
     name=Column(String)
 
 class Match(Base):
-    __tablename__="matches"
-    id=Column(Integer,primary_key=True)
-    team1_id=Column(Integer)
-    team2_id=Column(Integer)
-    overs=Column(Integer)
-    status=Column(String)
+    __tablename__ = "matches"
 
+    id = Column(Integer, primary_key=True)
+
+    teamA_id = Column(Integer, ForeignKey("teams.id"))
+    teamB_id = Column(Integer, ForeignKey("teams.id"))
+
+    status = Column(String)
+
+    scoreA = Column(String)
+    scoreB = Column(String)
+
+    oversA = Column(String)
+    oversB = Column(String)
+
+    note = Column(String)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
 class Ball(Base):
     __tablename__="balls"
     id=Column(Integer,primary_key=True)
