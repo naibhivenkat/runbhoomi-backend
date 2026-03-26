@@ -19,21 +19,21 @@ class Match(Base):
 
     id = Column(Integer, primary_key=True)
 
-    teamA_id = Column(Integer, ForeignKey("teams.id"))
-    teamB_id = Column(Integer, ForeignKey("teams.id"))
+    teamA_id = Column("team_a_id", Integer, ForeignKey("teams.id"))
+    teamB_id = Column("team_b_id", Integer, ForeignKey("teams.id"))
 
     status = Column(String)
 
-    scoreA = Column(String)
-    scoreB = Column(String)
+    scoreA = Column("score_a", String)
+    scoreB = Column("score_b", String)
 
-    oversA = Column(String)
-    oversB = Column(String)
+    oversA = Column("overs_a", String)
+    oversB = Column("overs_b", String)
 
     note = Column(String)
 
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
 class Ball(Base):
     __tablename__="balls"
     id=Column(Integer,primary_key=True)

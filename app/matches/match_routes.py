@@ -77,23 +77,23 @@ def get_matches(email: str, db: Session = Depends(get_db)):
 
     result = []
 
-    for match in matches:
+    for m in matches:
         teamA = db.query(models.Team).filter(
-            models.Team.id == match.teamA_id
+            models.Team.id == m.teamA_id
         ).first()
 
         teamB = db.query(models.Team).filter(
-            models.Team.id == match.teamB_id
+            models.Team.id == m.teamB_id
         ).first()
 
         result.append({
-            "id": match.id,
+            "id": m.id,
             "teamA": teamA.name if teamA else "",
             "teamB": teamB.name if teamB else "",
-            "scoreA": f"{match.scoreA} ({match.oversA} ov)" if match.scoreA else "",
-            "scoreB": f"{match.scoreB} ({match.oversB} ov)" if match.scoreB else "",
-            "status": match.status,
-            "note": match.note
+            "scoreA": f"{m.scoreA} ({m.oversA} ov)" if m.scoreA else "",
+            "scoreB": f"{m.scoreB} ({m.oversB} ov)" if m.scoreB else "",
+            "status": m.status,
+            "note": m.note
         })
 
     return result
