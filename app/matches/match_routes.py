@@ -15,10 +15,8 @@ def create_match(team1: int, team2: int, overs: int, db: Session = Depends(get_d
     return {"match_id": match.id}
 
 
-
 @router.get("/get_matches")
 def get_matches(email: str, db: Session = Depends(get_db)):
-
     player = db.query(models.Player).filter(
         models.Player.email == email
     ).first()
@@ -57,7 +55,6 @@ def get_matches(email: str, db: Session = Depends(get_db)):
 
 @router.get("/{match_id}")
 def get_match_detail(match_id: int, db: Session = Depends(get_db)):
-
     match = db.query(models.Match).options(
         joinedload(models.Match.teamA),
         joinedload(models.Match.teamB)
@@ -81,4 +78,92 @@ def get_match_detail(match_id: int, db: Session = Depends(get_db)):
         "status": match.status or "",
 
         "note": match.note or "",
+    }
+
+
+@router.get("/{match_id}/live")
+def get_live_score(match_id: int, db: Session = Depends(get_db)):
+    match = db.query(models.Match).filter(
+        models.Match.id == match_id
+    ).first()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    # 🔥 batsmen (striker first)
+    batsmen = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id,
+        models.Batsman.is_out == False
+    ).order_by(models.Batsman.is_striker.desc()).all()
+
+    # 🔥 current bowler
+    bowler = db.query(models.Bowler).filter(
+        models.Bowler.match_id == match_id
+    ).order_by(models.Bowler.id.desc()).first()
+
+    # 🔥 partnership
+    total_runs = sum(b.runs or 0 for b in batsmen)
+    total_balls = sum(b.balls or 0 for b in batsmen)
+
+    # 🔥 extras (placeholder)
+    extras = 0
+
+    # 🔥 SAFE RUN RATE CALCULATION
+    def calculate_run_rate(score, overs):
+        try:
+            runs = int((score or "0/0").split("/")[0])
+
+            if not overs or "." not in overs:
+                return 0
+
+            over_part, ball_part = overs.split(".")
+            total_overs = int(over_part) + int(ball_part) / 6
+
+            if total_overs == 0:
+                return 0
+
+            return round(runs / total_overs, 2)
+
+        except:
+            return 0
+
+    run_rate = calculate_run_rate(match.scoreA, match.oversA)
+
+    return {
+        "score": match.scoreA or "",
+        "overs": match.oversA or "",
+        "status": match.status or "",
+
+        "batsmen": [
+            {
+                "name": b.name,
+                "runs": b.runs or 0,
+                "balls": b.balls or 0,
+                "fours": b.fours or 0,
+                "sixes": b.sixes or 0,
+
+                # ✅ dynamic strike rate
+                "sr": round((b.runs / b.balls) * 100, 1) if b.balls else 0,
+
+                "is_striker": b.is_striker
+            }
+            for b in batsmen
+        ],
+
+        "bowler": {
+            "name": bowler.name if bowler else "",
+            "overs": bowler.overs if bowler else "",
+            "runs": bowler.runs if bowler else 0,
+            "wickets": bowler.wickets if bowler else 0,
+            "eco": bowler.economy if bowler else 0,
+        },
+
+        "extras": extras,
+
+        "partnership": {
+            "runs": total_runs,
+            "balls": total_balls
+        },
+
+        "run_rate": run_rate
     }

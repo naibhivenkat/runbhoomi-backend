@@ -113,3 +113,35 @@ class EmailOTP(Base):
     otp = Column(String, nullable=False)
     expiry = Column(BigInteger, nullable=False)
     attempts = Column(Integer, default=0)
+
+
+class Batsman(Base):
+    __tablename__ = "batsmen"
+
+    id = Column(Integer, primary_key=True)
+
+    match_id = Column(Integer, ForeignKey("matches.id"))
+
+    name = Column(String)
+    runs = Column(Integer, default=0)
+    balls = Column(Integer, default=0)
+    fours = Column(Integer, default=0)
+    sixes = Column(Integer, default=0)
+    strike_rate = Column(Float, default=0)
+
+    is_striker = Column(Boolean, default=False)
+    is_out = Column(Boolean, default=False)
+
+
+class Bowler(Base):
+    __tablename__ = "bowlers"
+
+    id = Column(Integer, primary_key=True)
+
+    match_id = Column(Integer, ForeignKey("matches.id"))
+
+    name = Column(String)
+    overs = Column(String)   # "3.2"
+    runs = Column(Integer)
+    wickets = Column(Integer)
+    economy = Column(Float)
