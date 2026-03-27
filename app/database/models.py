@@ -1,18 +1,44 @@
-from sqlalchemy import Column,Integer,String,Boolean,Float,DateTime, Date, BigInteger, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, Date, BigInteger, ForeignKey
 from datetime import datetime
+
+from sqlalchemy.orm import relationship
+
 from app.database.db import Base
 
+
 class User(Base):
-    __tablename__="users"
-    id=Column(Integer,primary_key=True)
-    name=Column(String)
-    email=Column(String,unique=True)
-    password_hash=Column(String)
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+    email = Column(String, unique=True)
+    password_hash = Column(String)
+
 
 class Team(Base):
-    __tablename__="teams"
-    id=Column(Integer,primary_key=True)
-    name=Column(String)
+    __tablename__ = "teams"
+    id = Column(Integer, primary_key=True)
+    name = Column(String)
+
+
+# class Match(Base):
+#     __tablename__ = "matches"
+#
+#     id = Column(Integer, primary_key=True)
+#
+#     teamA_id = Column("team_a_id", Integer, ForeignKey("teams.id"))
+#     teamB_id = Column("team_b_id", Integer, ForeignKey("teams.id"))
+#
+#     status = Column(String)
+#
+#     scoreA = Column("score_a", String)
+#     scoreB = Column("score_b", String)
+#
+#     oversA = Column("overs_a", String)
+#     oversB = Column("overs_b", String)
+#
+#     note = Column(String)
+#
+#     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Match(Base):
     __tablename__ = "matches"
@@ -21,6 +47,9 @@ class Match(Base):
 
     teamA_id = Column("team_a_id", Integer, ForeignKey("teams.id"))
     teamB_id = Column("team_b_id", Integer, ForeignKey("teams.id"))
+
+    teamA = relationship("Team", foreign_keys=[teamA_id])
+    teamB = relationship("Team", foreign_keys=[teamB_id])
 
     status = Column(String)
 
@@ -34,18 +63,19 @@ class Match(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 class Ball(Base):
-    __tablename__="balls"
-    id=Column(Integer,primary_key=True)
-    match_id=Column(Integer)
-    over=Column(Integer)
-    ball=Column(Integer)
-    runs=Column(Integer)
-    is_wicket=Column(Boolean)
-    shot_zone=Column(String)
-    pitch_x=Column(Float)
-    pitch_y=Column(Float)
-    created_at=Column(DateTime,default=datetime.utcnow)
+    __tablename__ = "balls"
+    id = Column(Integer, primary_key=True)
+    match_id = Column(Integer)
+    over = Column(Integer)
+    ball = Column(Integer)
+    runs = Column(Integer)
+    is_wicket = Column(Boolean)
+    shot_zone = Column(String)
+    pitch_x = Column(Float)
+    pitch_y = Column(Float)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Player(Base):
@@ -74,6 +104,7 @@ class Player(Base):
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class EmailOTP(Base):
     __tablename__ = "email_otp"
