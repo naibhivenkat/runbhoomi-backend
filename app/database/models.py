@@ -64,18 +64,18 @@ class Match(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-class Ball(Base):
-    __tablename__ = "balls"
-    id = Column(Integer, primary_key=True)
-    match_id = Column(Integer)
-    over = Column(Integer)
-    ball = Column(Integer)
-    runs = Column(Integer)
-    is_wicket = Column(Boolean)
-    shot_zone = Column(String)
-    pitch_x = Column(Float)
-    pitch_y = Column(Float)
-    created_at = Column(DateTime, default=datetime.utcnow)
+# class Ball(Base):
+#     __tablename__ = "balls"
+#     id = Column(Integer, primary_key=True)
+#     match_id = Column(Integer)
+#     over = Column(Integer)
+#     ball = Column(Integer)
+#     runs = Column(Integer)
+#     is_wicket = Column(Boolean)
+#     shot_zone = Column(String)
+#     pitch_x = Column(Float)
+#     pitch_y = Column(Float)
+#     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Player(Base):
@@ -145,3 +145,14 @@ class Bowler(Base):
     runs = Column(Integer)
     wickets = Column(Integer)
     economy = Column(Float)
+
+
+class Ball(Base):
+    __tablename__ = "balls"
+
+    id = Column(Integer, primary_key=True)
+    match_id = Column(Integer)
+    over = Column(Integer)
+    ball = Column(Integer)
+    runs = Column(Integer)
+    is_wicket = Column(Boolean)
