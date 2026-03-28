@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
-
+from sqlalchemy import or_
 from app.database import models
 from app.database.db import get_db
 
@@ -53,32 +53,32 @@ def get_matches(email: str, db: Session = Depends(get_db)):
     return result
 
 
-# @router.get("/{match_id}")
-# def get_match_detail(match_id: int, db: Session = Depends(get_db)):
-#     match = db.query(models.Match).options(
-#         joinedload(models.Match.teamA),
-#         joinedload(models.Match.teamB)
-#     ).filter(models.Match.id == match_id).first()
-#
-#     if not match:
-#         raise HTTPException(status_code=404, detail="Match not found")
-#
-#     return {
-#         "id": match.id,
-#
-#         "team1": match.teamA.name if match.teamA else "",
-#         "team2": match.teamB.name if match.teamB else "",
-#
-#         "score1": match.scoreA or "",
-#         "score2": match.scoreB or "",
-#
-#         "overs1": match.oversA or "",
-#         "overs2": match.oversB or "",
-#
-#         "status": match.status or "",
-#
-#         "note": match.note or "",
-#     }
+@router.get("/{match_id}")
+def get_match_detail(match_id: int, db: Session = Depends(get_db)):
+    match = db.query(models.Match).options(
+        joinedload(models.Match.teamA),
+        joinedload(models.Match.teamB)
+    ).filter(models.Match.id == match_id).first()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    return {
+        "id": match.id,
+
+        "team1": match.teamA.name if match.teamA else "",
+        "team2": match.teamB.name if match.teamB else "",
+
+        "score1": match.scoreA or "",
+        "score2": match.scoreB or "",
+
+        "overs1": match.oversA or "",
+        "overs2": match.oversB or "",
+
+        "status": match.status or "",
+
+        "note": match.note or "",
+    }
 #
 #
 # @router.get("/{match_id}/live")
@@ -170,44 +170,37 @@ def get_matches(email: str, db: Session = Depends(get_db)):
 #
 #
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_
-from app.database.db import get_db
-from app.database import models
-
-router = APIRouter()
 
 
-# 🔹 MATCH DETAIL
-@router.get("/{match_id}")
-def get_match_detail(match_id: int, db: Session = Depends(get_db)):
-    match = db.query(models.Match).options(
-        joinedload(models.Match.teamA),
-        joinedload(models.Match.teamB)
-    ).filter(models.Match.id == match_id).first()
+# # 🔹 MATCH DETAIL
+# @router.get("/{match_id}")
+# def get_match_detail(match_id: int, db: Session = Depends(get_db)):
+#     match = db.query(models.Match).options(
+#         joinedload(models.Match.teamA),
+#         joinedload(models.Match.teamB)
+#     ).filter(models.Match.id == match_id).first()
+#
+#     if not match:
+#         raise HTTPException(status_code=404, detail="Match not found")
+#
+#     return {
+#         "id": match.id,
+#
+#         "team1": match.teamA.name if match.teamA else "",
+#         "team2": match.teamB.name if match.teamB else "",
+#
+#         "score1": match.scoreA or "",
+#         "score2": match.scoreB or "",
+#
+#         "overs1": match.oversA or "",
+#         "overs2": match.oversB or "",
+#
+#         "status": match.status or "",
+#         "note": match.note or "",
+#     }
+#
 
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-
-    return {
-        "id": match.id,
-
-        "team1": match.teamA.name if match.teamA else "",
-        "team2": match.teamB.name if match.teamB else "",
-
-        "score1": match.scoreA or "",
-        "score2": match.scoreB or "",
-
-        "overs1": match.oversA or "",
-        "overs2": match.oversB or "",
-
-        "status": match.status or "",
-        "note": match.note or "",
-    }
-
-
-# 🔥 LIVE SCORE
+# # 🔥 LIVE SCORE
 @router.get("/{match_id}/live")
 def get_live_score(match_id: int, db: Session = Depends(get_db)):
     match = db.query(models.Match).filter(
