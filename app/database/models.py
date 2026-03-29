@@ -147,12 +147,23 @@ class Bowler(Base):
     economy = Column(Float)
 
 
+# class Ball(Base):
+#     __tablename__ = "balls"
+#
+#     id = Column(Integer, primary_key=True)
+#     match_id = Column(Integer)
+#     over = Column(Integer)
+#     ball = Column(Integer)
+#     runs = Column(Integer)
+#     is_wicket = Column(Boolean)
+
 class Ball(Base):
     __tablename__ = "balls"
 
     id = Column(Integer, primary_key=True)
     match_id = Column(Integer)
     over = Column(Integer)
-    ball = Column(Integer)
-    runs = Column(Integer)
-    is_wicket = Column(Boolean)
+    ball = Column(Integer)   # 1 to 6
+    runs = Column(Integer)   # 0,1,2,4,6
+    is_wicket = Column(Boolean, default=False)
+    created_at = Column(DateTime)

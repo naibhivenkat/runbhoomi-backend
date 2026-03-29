@@ -310,3 +310,34 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
 
         "run_rate": run_rate
     }
+
+
+@router.post("/{match_id}/add_ball")
+def add_ball(match_id: int, runs: int = 0, wicket: bool = False, db: Session = Depends(get_db)):
+
+    last_ball = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).order_by(models.Ball.id.desc()).first()
+
+    if last_ball:
+        over = last_ball.over
+        ball = last_ball.ball + 1
+        if ball > 6:
+            over += 1
+            ball = 1
+    else:
+        over = 0
+        ball = 1
+
+    new_ball = models.Ball(
+        match_id=match_id,
+        over=over,
+        ball=ball,
+        runs=runs,
+        is_wicket=wicket
+    )
+
+    db.add(new_ball)
+    db.commit()
+
+    return {"message": "Ball added"}
