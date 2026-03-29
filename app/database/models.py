@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, Date, BigInteger, ForeignKey
 from datetime import datetime
 
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, Date, BigInteger, ForeignKey
 from sqlalchemy.orm import relationship
 
 from app.database.db import Base
@@ -19,26 +19,6 @@ class Team(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String)
 
-
-# class Match(Base):
-#     __tablename__ = "matches"
-#
-#     id = Column(Integer, primary_key=True)
-#
-#     teamA_id = Column("team_a_id", Integer, ForeignKey("teams.id"))
-#     teamB_id = Column("team_b_id", Integer, ForeignKey("teams.id"))
-#
-#     status = Column(String)
-#
-#     scoreA = Column("score_a", String)
-#     scoreB = Column("score_b", String)
-#
-#     oversA = Column("overs_a", String)
-#     oversB = Column("overs_b", String)
-#
-#     note = Column(String)
-#
-#     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Match(Base):
     __tablename__ = "matches"
@@ -62,20 +42,6 @@ class Match(Base):
     note = Column(String)
 
     created_at = Column(DateTime, default=datetime.utcnow)
-
-
-# class Ball(Base):
-#     __tablename__ = "balls"
-#     id = Column(Integer, primary_key=True)
-#     match_id = Column(Integer)
-#     over = Column(Integer)
-#     ball = Column(Integer)
-#     runs = Column(Integer)
-#     is_wicket = Column(Boolean)
-#     shot_zone = Column(String)
-#     pitch_x = Column(Float)
-#     pitch_y = Column(Float)
-#     created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Player(Base):
@@ -141,29 +107,25 @@ class Bowler(Base):
     match_id = Column(Integer, ForeignKey("matches.id"))
 
     name = Column(String)
-    overs = Column(String)   # "3.2"
+    overs = Column(String)  # "3.2"
     runs = Column(Integer)
     wickets = Column(Integer)
     economy = Column(Float)
 
 
-# class Ball(Base):
-#     __tablename__ = "balls"
-#
-#     id = Column(Integer, primary_key=True)
-#     match_id = Column(Integer)
-#     over = Column(Integer)
-#     ball = Column(Integer)
-#     runs = Column(Integer)
-#     is_wicket = Column(Boolean)
-
 class Ball(Base):
     __tablename__ = "balls"
 
     id = Column(Integer, primary_key=True)
-    match_id = Column(Integer)
-    over = Column(Integer)
-    ball = Column(Integer)   # 1 to 6
-    runs = Column(Integer)   # 0,1,2,4,6
+    match_id = Column(Integer, nullable=False)
+
+    over = Column(Integer, nullable=False)
+    ball = Column(Integer, nullable=False)  # 1 to 6 (legal balls only)
+
+    runs = Column(Integer, default=0)  # bat runs
+    extra_type = Column(String, nullable=True)  # wide, no_ball, bye, leg_bye
+    extra_runs = Column(Integer, default=0)
+
     is_wicket = Column(Boolean, default=False)
-    created_at = Column(DateTime)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
