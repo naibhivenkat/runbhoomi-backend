@@ -303,13 +303,28 @@ class Tournament(Base):
     __tablename__ = "tournaments"
 
     id = Column(Integer, primary_key=True)
+
     name = Column(String, nullable=False)
-    format = Column(String)
-    overs = Column(Integer)
+    city = Column(String)
+    ground = Column(String)
+
+    organizer_name = Column(String)
+    organizer_phone = Column(String)
+    organizer_email = Column(String)
+
+    start_date = Column(String)
+    end_date = Column(String)
+
+    category = Column(String)       # local / corporate / college
+    ball_type = Column(String)      # tennis / leather
+    pitch_type = Column(String)     # turf / matting
+    match_type = Column(String)     # t20 / 100 / test
+
+    total_teams = Column(Integer)
+
+    logo_url = Column(String)
 
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    teams = relationship("TournamentTeam", back_populates="tournament")
 
 
 # =========================
@@ -319,9 +334,43 @@ class TournamentTeam(Base):
     __tablename__ = "tournament_teams"
 
     id = Column(Integer, primary_key=True)
-
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
-    team_id = Column(Integer, ForeignKey("teams.id"))
+    team_name = Column(String)
 
     tournament = relationship("Tournament", back_populates="teams")
-    team = relationship("Team")
+
+
+class TournamentMatch(Base):
+    __tablename__ = "tournament_matches"
+
+    id = Column(Integer, primary_key=True)
+
+    tournament_id = Column(Integer)
+    team_a = Column(String)
+    team_b = Column(String)
+
+    match_date = Column(String)
+    stage = Column(String)  # league / semi / final
+
+    winner = Column(String, nullable=True)
+
+
+class TournamentPoints(Base):
+    __tablename__ = "tournament_points"
+
+    id = Column(Integer, primary_key=True)
+
+    tournament_id = Column(Integer)
+    team_name = Column(String)
+
+    played = Column(Integer, default=0)
+    wins = Column(Integer, default=0)
+    losses = Column(Integer, default=0)
+
+    runs_scored = Column(Integer, default=0)
+    overs_faced = Column(Float, default=0)
+
+    runs_conceded = Column(Integer, default=0)
+    overs_bowled = Column(Float, default=0)
+
+    points = Column(Integer, default=0)

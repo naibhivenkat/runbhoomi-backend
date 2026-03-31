@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import models
 from app.database.db import get_db
+from app.database.models import TournamentPoints, TournamentMatch
 
 router = APIRouter(prefix="/matches")
 
@@ -375,3 +376,41 @@ def get_last_balls(match_id: int, db: Session = Depends(get_db)):
     return {
         "lastBalls": last_balls
     }
+
+
+@router.post("/{match_id}/result")
+def update_result(
+    match_id: int,
+    winner: str,
+    runs_scored: int,
+    overs: float,
+    db: Session = Depends(get_db)
+):
+
+    match = db.query(TournamentMatch).get(match_id)
+    match.winner = winner
+
+    # update points
+    teams = [match.team_a, match.team_b]
+
+    for team in teams:
+        p = db.query(TournamentPoints).filter_by(
+            tournament_id=match.tournament_id,
+            team_name=team
+        ).first()
+
+        p.played += 1
+
+        if team == winner:
+            p.wins += 1
+            p.points += 2
+            p.runs_scored += runs_scored
+            p.overs_faced += overs
+        else:
+            p.losses += 1
+            p.runs_conceded += runs_scored
+            p.overs_bowled += overs
+
+    db.commit()
+
+    return {"message": "Result updated"}
