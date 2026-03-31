@@ -28,6 +28,7 @@ class TournamentCreate(BaseModel):
 
     total_teams: int
     logo_url: str | None = None
+    banner_url: str | None = None
 
 
 @router.post("/create")
@@ -75,13 +76,12 @@ def get_tournaments(db: Session = Depends(get_db)):
             "name": t.name,
             "city": t.city,
             "ground": t.ground,
-            "start_date": t.start_date,
-            "end_date": t.end_date,
-            "category": t.category,
-            "ball_type": t.ball_type,
-            "pitch_type": t.pitch_type,
             "match_type": t.match_type,
             "total_teams": t.total_teams,
+            "start_date": t.start_date,
+            "end_date": t.end_date,
+            "logo_url": t.logo_url,
+            "banner_url": t.banner_url,
         }
         for t in tournaments
     ]
