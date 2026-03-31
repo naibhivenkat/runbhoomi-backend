@@ -73,8 +73,15 @@ def get_tournaments(db: Session = Depends(get_db)):
         {
             "id": t.id,
             "name": t.name,
-            "format": t.format,
-            "overs": t.overs
+            "city": t.city,
+            "ground": t.ground,
+            "start_date": t.start_date,
+            "end_date": t.end_date,
+            "category": t.category,
+            "ball_type": t.ball_type,
+            "pitch_type": t.pitch_type,
+            "match_type": t.match_type,
+            "total_teams": t.total_teams,
         }
         for t in tournaments
     ]
@@ -177,3 +184,11 @@ def get_matches(tournament_id: int, db: Session = Depends(get_db)):
         }
         for m in matches
     ]
+
+@router.get("/{tournament_id}/teams")
+def get_teams(tournament_id: int, db: Session = Depends(get_db)):
+    teams = db.query(TournamentTeam).filter_by(
+        tournament_id=tournament_id
+    ).all()
+
+    return [{"team_name": t.team_name} for t in teams]
