@@ -242,11 +242,11 @@ class Match(Base):
 
     status = Column(String, default="scheduled")
 
-    # ⚠️ Keep but DO NOT use for live
-    scoreA = Column(String, nullable=True)
-    scoreB = Column(String, nullable=True)
-    oversA = Column(String, nullable=True)
-    oversB = Column(String, nullable=True)
+    # ✅ FIXED MAPPING
+    scoreA = Column("score_a", String, nullable=True)
+    scoreB = Column("score_b", String, nullable=True)
+    oversA = Column("overs_a", String, nullable=True)
+    oversB = Column("overs_b", String, nullable=True)
 
     total_overs = Column(Integer, default=20)
     current_innings = Column(Integer, default=1)
