@@ -38,6 +38,8 @@ def create_tournament(data: TournamentCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(t)
 
+    print(models.Tournament.__mapper__.relationships)
+
     return {"id": t.id, "message": "Tournament created"}
 
 

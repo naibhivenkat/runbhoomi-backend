@@ -117,7 +117,6 @@
 #     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey, Date
 from sqlalchemy.orm import relationship
@@ -295,7 +294,6 @@ class Ball(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
-
 # =========================
 # 🏆 TOURNAMENT
 # =========================
@@ -315,16 +313,17 @@ class Tournament(Base):
     start_date = Column(String)
     end_date = Column(String)
 
-    category = Column(String)       # local / corporate / college
-    ball_type = Column(String)      # tennis / leather
-    pitch_type = Column(String)     # turf / matting
-    match_type = Column(String)     # t20 / 100 / test
+    category = Column(String)  # local / corporate / college
+    ball_type = Column(String)  # tennis / leather
+    pitch_type = Column(String)  # turf / matting
+    match_type = Column(String)  # t20 / 100 / test
 
     total_teams = Column(Integer)
 
     logo_url = Column(String)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    teams = relationship("TournamentTeam", back_populates="tournament")
 
 
 # =========================
@@ -374,3 +373,5 @@ class TournamentPoints(Base):
     overs_bowled = Column(Float, default=0)
 
     points = Column(Integer, default=0)
+
+
