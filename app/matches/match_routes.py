@@ -191,6 +191,100 @@ def get_match_detail(match_id: int, db: Session = Depends(get_db)):
 #         "run_rate": run_rate
 #     }
 
+# @router.get("/{match_id}/live")
+# def get_live_score(match_id: int, db: Session = Depends(get_db)):
+#     match = db.query(models.Match).filter(
+#         models.Match.id == match_id
+#     ).first()
+#
+#     if not match:
+#         raise HTTPException(status_code=404, detail="Match not found")
+#
+#     # 🔥 GET ALL BALLS
+#     balls = db.query(models.Ball).filter(
+#         models.Ball.match_id == match_id
+#     ).order_by(models.Ball.id.asc()).all()
+#
+#     # ✅ LAST OVER (LAST 6 BALLS)
+#     last_balls = []
+#     for b in balls[-6:]:
+#         if b.is_wicket:
+#             last_balls.append("W")
+#         else:
+#             last_balls.append(str(b.runs or 0))
+#
+#     # ✅ TOTAL RUNS
+#     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+#
+#     # ✅ WICKETS
+#     wickets = sum(1 for b in balls if b.is_wicket)
+#
+#     # ✅ LEGAL BALLS
+#     legal_balls = sum(
+#         1 for b in balls if b.extra_type not in ["wide", "no_ball"]
+#     )
+#
+#     overs_display = f"{legal_balls // 6}.{legal_balls % 6}"
+#
+#     score = f"{total_runs}/{wickets}"
+#
+#     # 🔥 BATSMEN (same as your existing logic)
+#     batsmen = db.query(models.Batsman).filter(
+#         models.Batsman.match_id == match_id,
+#         or_(
+#             models.Batsman.is_out == False,
+#             models.Batsman.is_out == None
+#         )
+#     ).order_by(models.Batsman.is_striker.desc()).all()
+#
+#     batsmen_response = [
+#         {
+#             "name": b.name or "Unknown",
+#             "runs": b.runs or 0,
+#             "balls": b.balls or 0,
+#             "fours": b.fours or 0,
+#             "sixes": b.sixes or 0,
+#             "sr": round((b.runs / b.balls) * 100, 1) if b.balls else 0,
+#             "is_striker": b.is_striker or False
+#         }
+#         for b in batsmen
+#     ] if batsmen else [{
+#         "name": "Yet to bat",
+#         "runs": 0,
+#         "balls": 0,
+#         "fours": 0,
+#         "sixes": 0,
+#         "sr": 0,
+#         "is_striker": False
+#     }]
+#
+#     # 🔥 BOWLER
+#     bowler = db.query(models.Bowler).filter(
+#         models.Bowler.match_id == match_id
+#     ).order_by(models.Bowler.id.desc()).first()
+#
+#     return {
+#         "score": score,
+#         "overs": overs_display,
+#         "status": match.status or "Live",
+#
+#         "last_over": last_balls,  # ✅🔥 THIS FIXES YOUR UI
+#
+#         "batsmen": batsmen_response,
+#
+#         "bowler": {
+#             "name": bowler.name if bowler else "N/A",
+#             "overs": bowler.overs if bowler else "",
+#             "runs": bowler.runs if bowler else 0,
+#             "wickets": bowler.wickets if bowler else 0,
+#             "eco": bowler.economy if bowler else 0,
+#         },
+#
+#         "extras": 0,
+#         "run_rate": 0
+#     }
+
+
 @router.get("/{match_id}/live")
 def get_live_score(match_id: int, db: Session = Depends(get_db)):
     match = db.query(models.Match).filter(
@@ -200,35 +294,31 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
     if not match:
         raise HTTPException(status_code=404, detail="Match not found")
 
-    # 🔥 GET ALL BALLS
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
     ).order_by(models.Ball.id.asc()).all()
 
-    # ✅ LAST OVER (LAST 6 BALLS)
-    last_balls = []
-    for b in balls[-6:]:
-        if b.is_wicket:
-            last_balls.append("W")
-        else:
-            last_balls.append(str(b.runs or 0))
-
-    # ✅ TOTAL RUNS
+    # 🔥 SCORE
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
-
-    # ✅ WICKETS
     wickets = sum(1 for b in balls if b.is_wicket)
 
-    # ✅ LEGAL BALLS
+    # 🔥 BALLS
     legal_balls = sum(
         1 for b in balls if b.extra_type not in ["wide", "no_ball"]
     )
 
-    overs_display = f"{legal_balls // 6}.{legal_balls % 6}"
-
+    overs = f"{legal_balls // 6}.{legal_balls % 6}"
     score = f"{total_runs}/{wickets}"
 
-    # 🔥 BATSMEN (same as your existing logic)
+    # 🔥 LAST OVER
+    last_over = []
+    for b in balls[-6:]:
+        if b.is_wicket:
+            last_over.append("W")
+        else:
+            last_over.append(str(b.runs or 0))
+
+    # 🔥 BATSMEN
     batsmen = db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id,
         or_(
@@ -263,12 +353,15 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
         models.Bowler.match_id == match_id
     ).order_by(models.Bowler.id.desc()).first()
 
+    # 🔥 RUN RATE
+    run_rate = round(total_runs / (legal_balls / 6), 2) if legal_balls else 0
+
     return {
         "score": score,
-        "overs": overs_display,
+        "overs": overs,
         "status": match.status or "Live",
 
-        "last_over": last_balls,  # ✅🔥 THIS FIXES YOUR UI
+        "last_over": last_over,
 
         "batsmen": batsmen_response,
 
@@ -281,7 +374,7 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
         },
 
         "extras": 0,
-        "run_rate": 0
+        "run_rate": run_rate
     }
 
 @router.post("/{match_id}/add_ball")
