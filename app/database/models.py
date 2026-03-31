@@ -324,6 +324,7 @@ class Tournament(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     teams = relationship("TournamentTeam", back_populates="tournament")
+    banner_url = Column(String)
 
 
 # =========================
@@ -373,5 +374,3 @@ class TournamentPoints(Base):
     overs_bowled = Column(Float, default=0)
 
     points = Column(Integer, default=0)
-
-

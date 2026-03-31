@@ -46,7 +46,6 @@ def create_tournament(data: TournamentCreate, db: Session = Depends(get_db)):
 
 @router.post("/{tournament_id}/add_team")
 def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
-
     team = TournamentTeam(
         tournament_id=tournament_id,
         team_name=team_name
@@ -80,8 +79,8 @@ def get_tournaments(db: Session = Depends(get_db)):
             "total_teams": t.total_teams,
             "start_date": t.start_date,
             "end_date": t.end_date,
-            "logo_url": t.logo_url,
-            "banner_url": t.banner_url,
+            "banner_url": getattr(t, "banner_url", None),
+            "logo_url": getattr(t, "logo_url", None),
         }
         for t in tournaments
     ]
@@ -89,7 +88,6 @@ def get_tournaments(db: Session = Depends(get_db)):
 
 @router.post("/{tournament_id}/generate_fixtures")
 def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
-
     teams = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id
     ).all()
@@ -116,7 +114,6 @@ def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: int, db: Session = Depends(get_db)):
-
     points = db.query(TournamentPoints).filter_by(
         tournament_id=tournament_id
     ).all()
@@ -141,9 +138,9 @@ def get_points(tournament_id: int, db: Session = Depends(get_db)):
 
     return result
 
+
 @router.post("/{tournament_id}/generate_knockouts")
 def generate_knockouts(tournament_id: int, db: Session = Depends(get_db)):
-
     points = get_points(tournament_id, db)
 
     top4 = points[:4]
@@ -184,6 +181,7 @@ def get_matches(tournament_id: int, db: Session = Depends(get_db)):
         }
         for m in matches
     ]
+
 
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):

@@ -13,10 +13,10 @@ router = APIRouter(prefix="/matches")
 
 @router.post("/create_match")
 def create_match(
-    team_a_id: int,
-    team_b_id: int,
-    overs: int = 20,
-    db: Session = Depends(get_db)
+        team_a_id: int,
+        team_b_id: int,
+        overs: int = 20,
+        db: Session = Depends(get_db)
 ):
     match = models.Match(
         teamA_id=team_a_id,
@@ -35,12 +35,11 @@ def create_match(
     }
 
 
-
 @router.post("/add_player_to_team")
 def add_player_to_team(
-    team_id: int,
-    player_id: int,
-    db: Session = Depends(get_db)
+        team_id: int,
+        player_id: int,
+        db: Session = Depends(get_db)
 ):
     tp = models.TeamPlayer(
         team_id=team_id,
@@ -55,10 +54,10 @@ def add_player_to_team(
 
 @router.post("/{match_id}/set_playing_xi")
 def set_playing_xi(
-    match_id: int,
-    team_id: int,
-    player_ids: list[int],
-    db: Session = Depends(get_db)
+        match_id: int,
+        team_id: int,
+        player_ids: list[int],
+        db: Session = Depends(get_db)
 ):
     if len(player_ids) != 11:
         raise HTTPException(status_code=400, detail="Must select 11 players")
@@ -84,11 +83,11 @@ def set_playing_xi(
 
 @router.post("/{match_id}/start_match")
 def start_match(
-    match_id: int,
-    striker_id: int,
-    non_striker_id: int,
-    bowler_name: str,
-    db: Session = Depends(get_db)
+        match_id: int,
+        striker_id: int,
+        non_striker_id: int,
+        bowler_name: str,
+        db: Session = Depends(get_db)
 ):
     match = db.query(models.Match).filter(
         models.Match.id == match_id
@@ -136,6 +135,8 @@ def start_match(
     db.commit()
 
     return {"message": "Match started"}
+
+
 @router.get("/get_matches")
 def get_matches(email: str, db: Session = Depends(get_db)):
     player = db.query(models.Player).filter(
@@ -380,13 +381,12 @@ def get_last_balls(match_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{match_id}/result")
 def update_result(
-    match_id: int,
-    winner: str,
-    runs_scored: int,
-    overs: float,
-    db: Session = Depends(get_db)
+        match_id: int,
+        winner: str,
+        runs_scored: int,
+        overs: float,
+        db: Session = Depends(get_db)
 ):
-
     match = db.query(TournamentMatch).get(match_id)
     match.winner = winner
 
