@@ -131,6 +131,97 @@
 #     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+#
+# from datetime import datetime
+# from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey
+# from sqlalchemy.orm import relationship
+# from app.database.db import Base
+#
+#
+# class Match(Base):
+#     __tablename__ = "matches"
+#
+#     id = Column(Integer, primary_key=True)
+#
+#     team_a_id = Column(Integer, ForeignKey("teams.id"))
+#     team_b_id = Column(Integer, ForeignKey("teams.id"))
+#
+#     teamA = relationship("Team", foreign_keys=[team_a_id])
+#     teamB = relationship("Team", foreign_keys=[team_b_id])
+#
+#     status = Column(String, default="scheduled")
+#
+#     # ⚠️ Keep but DO NOT use for live
+#     scoreA = Column(String, nullable=True)
+#     scoreB = Column(String, nullable=True)
+#     oversA = Column(String, nullable=True)
+#     oversB = Column(String, nullable=True)
+#
+#     total_overs = Column(Integer, default=20)
+#     current_innings = Column(Integer, default=1)
+#
+#     note = Column(String)
+#
+#     created_at = Column(DateTime, default=datetime.utcnow)
+#
+#
+# class Team(Base):
+#     __tablename__ = "teams"
+#     id = Column(Integer, primary_key=True)
+#     name = Column(String)
+#
+#
+# class Batsman(Base):
+#     __tablename__ = "batsmen"
+#
+#     id = Column(Integer, primary_key=True)
+#     match_id = Column(Integer, ForeignKey("matches.id"))
+#
+#     name = Column(String)
+#
+#     runs = Column(Integer, default=0)
+#     balls = Column(Integer, default=0)
+#     fours = Column(Integer, default=0)
+#     sixes = Column(Integer, default=0)
+#
+#     is_striker = Column(Boolean, default=False)
+#     is_out = Column(Boolean, default=False)
+#
+#
+# class Bowler(Base):
+#     __tablename__ = "bowlers"
+#
+#     id = Column(Integer, primary_key=True)
+#     match_id = Column(Integer, ForeignKey("matches.id"))
+#
+#     name = Column(String)
+#
+#     overs = Column(String)
+#     runs = Column(Integer, default=0)
+#     wickets = Column(Integer, default=0)
+#     economy = Column(Float, default=0)
+#
+#
+# class Ball(Base):
+#     __tablename__ = "balls"
+#
+#     id = Column(Integer, primary_key=True)
+#
+#     match_id = Column(Integer, ForeignKey("matches.id"))
+#
+#     innings = Column(Integer, default=1)
+#
+#     over = Column(Integer, nullable=False)
+#     ball = Column(Integer, nullable=False)
+#
+#     runs = Column(Integer, default=0)
+#     extra_type = Column(String, nullable=True)
+#     extra_runs = Column(Integer, default=0)
+#
+#     is_wicket = Column(Boolean, default=False)
+#
+#     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, ForeignKey
@@ -143,11 +234,11 @@ class Match(Base):
 
     id = Column(Integer, primary_key=True)
 
-    teamA_id = Column(Integer, ForeignKey("teams.id"))
-    teamB_id = Column(Integer, ForeignKey("teams.id"))
+    team_a_id = Column(Integer, ForeignKey("teams.id"))
+    team_b_id = Column(Integer, ForeignKey("teams.id"))
 
-    teamA = relationship("Team", foreign_keys=[teamA_id])
-    teamB = relationship("Team", foreign_keys=[teamB_id])
+    teamA = relationship("Team", foreign_keys=[team_a_id])
+    teamB = relationship("Team", foreign_keys=[team_b_id])
 
     status = Column(String, default="scheduled")
 
