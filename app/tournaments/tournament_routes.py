@@ -91,7 +91,6 @@ def create_tournament(data: TournamentCreate, db: Session = Depends(get_db)):
 
 @router.post("/{tournament_id}/add_team")
 def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
-
     tournament = db.query(models.Tournament).filter_by(
         id=tournament_id
     ).first()
@@ -128,7 +127,7 @@ def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
     entry = TournamentTeam(
         tournament_id=tournament_id,
         team_id=team.id,
-        status="approved"   # keep workflow same
+        status="approved"  # keep workflow same
     )
 
     db.add(entry)
@@ -143,6 +142,7 @@ def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Team added"}
+
 
 @router.get("/")
 def get_tournaments(db: Session = Depends(get_db)):
@@ -280,7 +280,6 @@ def get_matches(tournament_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):
-
     teams = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         status="approved"
@@ -294,6 +293,7 @@ def get_teams(tournament_id: int, db: Session = Depends(get_db)):
         }
         for t in teams
     ]
+
 
 # @router.delete("/teams/{team_id}")
 # def delete_team(team_id: int, db: Session = Depends(get_db)):
@@ -311,7 +311,6 @@ def get_teams(tournament_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/teams/{team_id}")
 def delete_team(team_id: int, db: Session = Depends(get_db)):
-
     entry = db.query(TournamentTeam).filter(
         TournamentTeam.id == team_id
     ).first()
@@ -324,6 +323,7 @@ def delete_team(team_id: int, db: Session = Depends(get_db)):
 
     return {"message": "Team deleted"}
 
+
 @router.post("/teams/create")
 def create_team(name: str, captain_id: int, db: Session = Depends(get_db)):
     team = Team(name=name, captain_id=captain_id)
@@ -334,9 +334,9 @@ def create_team(name: str, captain_id: int, db: Session = Depends(get_db)):
 
     return team
 
+
 @router.post("/{tournament_id}/join")
 def join_tournament(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
-
     existing = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team_id
@@ -359,7 +359,6 @@ def join_tournament(tournament_id: int, team_id: int, db: Session = Depends(get_
 
 @router.post("/{tournament_id}/approve/{team_id}")
 def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
-
     entry = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team_id
@@ -374,9 +373,9 @@ def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)
 
     return {"message": "Approved"}
 
+
 @router.get("/{tournament_id}/requests")
 def get_requests(tournament_id: int, db: Session = Depends(get_db)):
-
     teams = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         status="pending"
