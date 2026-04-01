@@ -127,7 +127,7 @@ def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
     entry = TournamentTeam(
         tournament_id=tournament_id,
         team_id=team.id,
-        status="approved"  # keep workflow same
+        status="pending"
     )
 
     db.add(entry)
@@ -388,3 +388,18 @@ def get_requests(tournament_id: int, db: Session = Depends(get_db)):
         }
         for t in teams
     ]
+
+@router.post("/{tournament_id}/reject/{team_id}")
+def reject_team(tournament_id: int, team_id: int, db: Session):
+    entry = db.query(TournamentTeam).filter_by(
+        tournament_id=tournament_id,
+        team_id=team_id
+    ).first()
+
+    if not entry:
+        raise HTTPException(404, "Not found")
+
+    entry.status = "rejected"
+    db.commit()
+
+    return {"message": "Rejected"}
