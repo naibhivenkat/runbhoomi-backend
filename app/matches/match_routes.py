@@ -542,7 +542,12 @@ def get_matches(email: str, db: Session = Depends(get_db)):
         overs = f"{legal_balls // 6}.{legal_balls % 6}"
 
         live_score = f"{total_runs}/{wickets}" if balls else ""
+        note = ""
 
+        if m.current_innings == 2:
+            note = m.note
+        elif m.current_innings == 1:
+            note = f"{m.teamA.name} batting"
         result.append({
             "id": m.id,
             "teamA": m.teamA.name if m.teamA else "",
@@ -560,8 +565,7 @@ def get_matches(email: str, db: Session = Depends(get_db)):
             "status": m.status,
 
             # ✅ FIX: always keep note
-            "note": m.note or ""
-        })
+            "note": note})
 
     return result
 
