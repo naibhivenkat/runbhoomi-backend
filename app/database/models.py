@@ -16,7 +16,10 @@ class Team(Base):
     captain_id = Column(Integer, ForeignKey("players.id"))
 
     players = relationship("TeamPlayer", back_populates="team")
-    captain = relationship("Player")
+    captain = relationship(
+        "Player",
+        foreign_keys=[captain_id]
+    )
 
 
 # =========================
@@ -50,7 +53,10 @@ class Player(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    team = relationship("Team")
+    team = relationship(
+        "Team",
+        foreign_keys=[team_id]
+    )
     squads = relationship("TeamPlayer", back_populates="player")
 
 
