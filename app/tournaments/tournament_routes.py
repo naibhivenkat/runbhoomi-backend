@@ -332,7 +332,11 @@ def create_team(name: str, captain_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(team)
 
-    return team
+    return {
+        "id": team.id,
+        "name": team.name,
+        "captain_id": team.captain_id
+    }
 
 
 @router.post("/{tournament_id}/join")
@@ -389,8 +393,12 @@ def get_requests(tournament_id: int, db: Session = Depends(get_db)):
         for t in teams
     ]
 
+
 @router.post("/{tournament_id}/reject/{team_id}")
-def reject_team(tournament_id: int, team_id: int, db: Session):
+def reject_team(
+        tournament_id: int,
+        team_id: int,
+        db: Session = Depends(get_db)):
     entry = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team_id
