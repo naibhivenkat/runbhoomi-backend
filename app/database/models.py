@@ -13,7 +13,10 @@ class Team(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String)
 
+    captain_id = Column(Integer, ForeignKey("players.id"))
+
     players = relationship("TeamPlayer", back_populates="team")
+    captain = relationship("Player")
 
 
 # =========================
@@ -215,10 +218,14 @@ class TournamentTeam(Base):
     __tablename__ = "tournament_teams"
 
     id = Column(Integer, primary_key=True)
+
     tournament_id = Column(Integer, ForeignKey("tournaments.id"))
-    team_name = Column(String)
+    team_id = Column(Integer, ForeignKey("teams.id"))
+
+    status = Column(String, default="pending")  # pending / approved
 
     tournament = relationship("Tournament", back_populates="teams")
+    team = relationship("Team")
 
 
 class TournamentMatch(Base):
