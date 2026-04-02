@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.database import models
 from app.database.db import get_db
-from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam
+from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam, TeamInvite, \
+    TeamPlayer
 from app.tournaments.group_service import create_groups, round_robin, generate_knockout
 
 router = APIRouter(prefix="/tournaments")
@@ -495,3 +496,41 @@ def get_matches(tournament_id: int, db: Session = Depends(get_db)):
         })
 
     return result
+
+
+import uuid
+
+@router.post("/teams/{team_id}/invite")
+def create_invite(team_id: int, db: Session = Depends(get_db)):
+
+    code = str(uuid.uuid4())[:8]
+
+    invite = TeamInvite(
+        team_id=team_id,
+        code=code
+    )
+
+    db.add(invite)
+    db.commit()
+
+    return {
+        "code": code,
+        "link": f"https://runbhoomi.app/join-team/{code}"
+    }
+
+@router.post("/teams/join/{code}")
+def join_team_by_code(code: str, player_id: int, db: Session = Depends(get_db)):
+
+    invite = db.query(TeamInvite).filter_by(code=code).first()
+
+    if not invite:
+        raise HTTPException(404, "Invalid code")
+
+    db.add(TeamPlayer(
+        team_id=invite.team_id,
+        player_id=player_id
+    ))
+
+    db.commit()
+
+    return {"message": "Joined team"}

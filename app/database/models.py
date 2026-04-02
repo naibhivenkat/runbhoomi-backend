@@ -298,3 +298,11 @@ class GroupTeam(Base):
     id = Column(Integer, primary_key=True)
     group_id = Column(Integer, ForeignKey("tournament_groups.id"))
     team_id = Column(Integer, ForeignKey("teams.id"))
+
+class TeamInvite(Base):
+    __tablename__ = "team_invites"
+
+    id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.id"))
+    code = Column(String, unique=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
