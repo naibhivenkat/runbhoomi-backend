@@ -47,7 +47,7 @@ def create_tournament(data: TournamentCreate, db: Session = Depends(get_db)):
     return {"id": t.id, "message": "Tournament created"}
 
 
-@router.post("/tournament/{tm_id}/init")
+@router.post("/matches/{tm_id}/init")
 def init_match_from_fixture(tm_id: int, db: Session = Depends(get_db)):
     tm = db.query(models.TournamentMatch).get(tm_id)
 
