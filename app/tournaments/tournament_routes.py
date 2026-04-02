@@ -54,14 +54,14 @@ def init_match_from_fixture(tm_id: int, db: Session = Depends(get_db)):
     if not tm:
         raise HTTPException(404, "Fixture not found")
 
-    # if already created
+    # already created
     if tm.match_id:
         return {"match_id": tm.match_id}
 
-    # create real match
+    # ✅ FIX: USE REAL TEAM IDs
     match = models.Match(
-        team_a_id=None,  # we improve later
-        team_b_id=None,
+        team_a_id=tm.team_a_id,
+        team_b_id=tm.team_b_id,
         status="created"
     )
 
@@ -73,7 +73,6 @@ def init_match_from_fixture(tm_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"match_id": match.id}
-
 
 @router.post("/{tournament_id}/add_team")
 def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
