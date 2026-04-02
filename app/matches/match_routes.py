@@ -224,25 +224,28 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
 
     run_rate = round(total_runs / (legal_balls / 6), 2) if legal_balls else 0
 
+    # ✅ GET ACTIVE BATSMEN
     batsmen = db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id,
         models.Batsman.is_out == False
     ).all()
 
+    # ✅ FIXED LOOP (INSIDE APPEND)
     batsmen_data = []
     for b in batsmen:
         sr = (b.runs / b.balls * 100) if b.balls > 0 else 0
 
-    batsmen_data.append({
-        "name": b.name,
-        "runs": b.runs,
-        "balls": b.balls,
-        "fours": b.fours,
-        "sixes": b.sixes,
-        "sr": round(sr, 1),
-        "is_striker": b.is_striker
-    })
+        batsmen_data.append({
+            "name": b.name,
+            "runs": b.runs,
+            "balls": b.balls,
+            "fours": b.fours,
+            "sixes": b.sixes,
+            "sr": round(sr, 1),
+            "is_striker": b.is_striker
+        })
 
+    # ✅ BOWLER (TEMP BASIC)
     bowler_data = {
         "name": "Current Bowler",
         "overs": overs,
@@ -254,13 +257,10 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
     return {
         "score": score,
         "overs": overs,
-
         "status": match.note or "Live",
-
         "last_over": last_over,
         "batsmen": batsmen_data,
         "bowler": bowler_data,
-
         "extras": 0,
         "run_rate": run_rate
     }
