@@ -79,83 +79,6 @@ def start_match(match_id: int, striker_id: int,
     return {"message": "Match started"}
 
 
-# =========================
-# GET MATCHES (🔥 FIXED)
-# =========================
-# @router.get("/get_matches")
-# def get_matches(email: str, db: Session = Depends(get_db)):
-#
-#     player = db.query(models.Player).filter(
-#         models.Player.email == email
-#     ).first()
-#
-#     if not player or not player.team_id:
-#         # 🔥 TEMP: return all matches if user not mapped
-#         matches = db.query(models.Match).options(
-#             joinedload(models.Match.teamA),
-#             joinedload(models.Match.teamB)
-#         ).all()
-#     else:
-#         matches = db.query(models.Match).options(
-#             joinedload(models.Match.teamA),
-#             joinedload(models.Match.teamB)
-#         ).filter(
-#             (models.Match.team_a_id == player.team_id) |
-#             (models.Match.team_b_id == player.team_id)
-#         ).all()
-#
-#     result = []
-#
-#     for m in matches:
-#
-#         # 🔥 LIVE CALCULATION
-#         balls = db.query(models.Ball).filter(
-#             models.Ball.match_id == m.id
-#         ).all()
-#
-#         total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
-#         wickets = sum(1 for b in balls if b.is_wicket)
-#
-#         legal_balls = sum(
-#             1 for b in balls if b.extra_type not in ["wide", "no_ball"]
-#         )
-#
-#         overs = f"{legal_balls // 6}.{legal_balls % 6}"
-#
-#         live_score = f"{total_runs}/{wickets}" if balls else ""
-#         note = ""
-#
-#         if m.current_innings == 2:
-#             note = m.note
-#         elif m.current_innings == 1:
-#             note = f"{m.teamA.name} batting"
-#         result.append({
-#             "id": m.id,
-#             "teamA": m.teamA.name if m.teamA else "",
-#             "teamB": m.teamB.name if m.teamB else "",
-#
-#             # ✅ FIX: live vs completed
-#             "scoreA": live_score if m.status == "live" else (
-#                 f"{m.scoreA} ({m.oversA})" if m.scoreA else ""
-#             ),
-#
-#             "scoreB": f"{m.scoreB} ({m.oversB})" if m.scoreB else "",
-#
-#             "overs": overs if m.status == "live" else m.oversA,
-#
-#             "status": m.status,
-#
-#
-#             "note": note})
-#
-#     return result
-
-
-# =========================
-# MATCH DETAIL
-# =========================
-
-
 @router.get("/get_matches")
 def get_matches(email: str, db: Session = Depends(get_db)):
     player = db.query(models.Player).filter(
@@ -301,16 +224,43 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
 
     run_rate = round(total_runs / (legal_balls / 6), 2) if legal_balls else 0
 
+    batsmen = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id,
+        models.Batsman.is_out == False
+    ).all()
+
+    batsmen_data = []
+    for b in batsmen:
+        sr = (b.runs / b.balls * 100) if b.balls > 0 else 0
+
+    batsmen_data.append({
+        "name": b.name,
+        "runs": b.runs,
+        "balls": b.balls,
+        "fours": b.fours,
+        "sixes": b.sixes,
+        "sr": round(sr, 1),
+        "is_striker": b.is_striker
+    })
+
+    bowler_data = {
+        "name": "Current Bowler",
+        "overs": overs,
+        "runs": total_runs,
+        "wickets": wickets,
+        "eco": run_rate
+    }
+
     return {
         "score": score,
         "overs": overs,
 
-        # ✅ FIX: DO NOT override note
         "status": match.note or "Live",
 
         "last_over": last_over,
-        "batsmen": [],
-        "bowler": {},
+        "batsmen": batsmen_data,
+        "bowler": bowler_data,
+
         "extras": 0,
         "run_rate": run_rate
     }
