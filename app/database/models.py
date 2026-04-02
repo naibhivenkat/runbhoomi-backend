@@ -215,6 +215,8 @@ class Tournament(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     teams = relationship("TournamentTeam", back_populates="tournament")
     banner_url = Column(String)
+    format = Column(String, default="league")
+    overs = Column(Integer, default=6)
 
 
 # =========================
@@ -244,9 +246,17 @@ class TournamentMatch(Base):
     team_b = Column(String)
 
     match_date = Column(String)
-    stage = Column(String)  # league / semi / final
+    stage = Column(String)
 
     winner = Column(String, nullable=True)
+
+    match_id = Column(Integer, nullable=True)
+    team_a_id = Column(Integer)
+    team_b_id = Column(Integer)
+
+    group_id = Column(Integer, nullable=True)
+    match_type = Column(String, default="league")
+    round = Column(Integer, default=1)
 
 
 class TournamentPoints(Base):
@@ -268,3 +278,23 @@ class TournamentPoints(Base):
     overs_bowled = Column(Float, default=0)
 
     points = Column(Integer, default=0)
+    ties = Column(Integer, default=0)
+
+
+# =========================
+# 🧩 NEW: GROUPS
+# =========================
+class TournamentGroup(Base):
+    __tablename__ = "tournament_groups"
+
+    id = Column(Integer, primary_key=True)
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"))
+    name = Column(String)
+
+
+class GroupTeam(Base):
+    __tablename__ = "group_teams"
+
+    id = Column(Integer, primary_key=True)
+    group_id = Column(Integer, ForeignKey("tournament_groups.id"))
+    team_id = Column(Integer, ForeignKey("teams.id"))

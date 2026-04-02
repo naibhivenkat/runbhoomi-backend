@@ -1,0 +1,67 @@
+from app.database.models import TournamentGroup, GroupTeam
+
+def create_groups(db, tournament_id, teams):
+    n = len(teams)
+
+    if n <= 6:
+        return None
+
+    group_count = 2 if n <= 10 else 3
+
+    groups = []
+    for i in range(group_count):
+        g = TournamentGroup(
+            tournament_id=tournament_id,
+            name=f"Group {chr(65+i)}"
+        )
+        db.add(g)
+        db.commit()
+        db.refresh(g)
+        groups.append(g)
+
+    for i, t in enumerate(teams):
+        db.add(GroupTeam(
+            group_id=groups[i % group_count].id,
+            team_id=t.team_id
+        ))
+
+    db.commit()
+    return groups
+
+
+def round_robin(team_ids):
+    fixtures = []
+
+    for i in range(len(team_ids)):
+        for j in range(i + 1, len(team_ids)):
+            fixtures.append((team_ids[i], team_ids[j]))
+
+    return fixtures
+
+
+import math
+
+def generate_knockout(team_ids):
+    n = len(team_ids)
+    power = 2 ** math.ceil(math.log2(n))
+
+    byes = power - n
+    teams = team_ids.copy()
+
+    for _ in range(byes):
+        teams.append(None)
+
+    fixtures = []
+
+    for i in range(0, len(teams), 2):
+        fixtures.append((teams[i], teams[i+1]))
+
+    return fixtures
+
+def calculate_nrr(p):
+    if p.overs_faced == 0 or p.overs_bowled == 0:
+        return 0
+
+    return (p.runs_scored / p.overs_faced) - (
+        p.runs_conceded / p.overs_bowled
+    )
