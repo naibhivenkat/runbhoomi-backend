@@ -306,22 +306,22 @@ def generate_knockouts(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Semis created"}
 
 
-@router.get("/{tournament_id}/matches")
-def get_matches(tournament_id: int, db: Session = Depends(get_db)):
-    matches = db.query(TournamentMatch).filter_by(
-        tournament_id=tournament_id
-    ).all()
-
-    return [
-        {
-            "id": m.id,
-            "team_a": m.team_a,
-            "team_b": m.team_b,
-            "stage": m.stage,
-            "winner": m.winner
-        }
-        for m in matches
-    ]
+# @router.get("/{tournament_id}/matches")
+# def get_matches(tournament_id: int, db: Session = Depends(get_db)):
+#     matches = db.query(TournamentMatch).filter_by(
+#         tournament_id=tournament_id
+#     ).all()
+#
+#     return [
+#         {
+#             "id": m.id,
+#             "team_a": m.team_a,
+#             "team_b": m.team_b,
+#             "stage": m.stage,
+#             "winner": m.winner
+#         }
+#         for m in matches
+#     ]
 
 
 @router.get("/{tournament_id}/teams")
