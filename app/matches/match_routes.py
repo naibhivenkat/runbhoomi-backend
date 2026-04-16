@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session, joinedload
 
@@ -10,6 +11,10 @@ from app.database.models import TournamentPoints, TournamentMatch
 
 router = APIRouter(prefix="/matches")
 
+
+class AddPlayerRequest(BaseModel):
+    team_id: int
+    player_id: int
 
 # =========================
 # CREATE MATCH
@@ -191,6 +196,8 @@ def get_match_detail(match_id: int, db: Session = Depends(get_db)):
         "status": match.status or "",
         "note": match.note or "",
     }
+
+
 
 
 # =========================
@@ -474,15 +481,26 @@ def update_result(
     return {"message": "Result updated"}
 
 
-@router.post("/add_player_to_team")
-def add_player_to_team(
-        team_id: int,
-        player_id: int,
-        db: Session = Depends(get_db)
-):
+# @router.post("/add_player_to_team")
+# def add_player_to_team(
+#         team_id: int,
+#         player_id: int,
+#         db: Session = Depends(get_db)
+# ):
+#     tp = models.TeamPlayer(
+#         team_id=team_id,
+#         player_id=player_id
+#     )
+#
+#     db.add(tp)
+#     db.commit()
+#
+#     return {"message": "Player added to team"}
+
+def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
     tp = models.TeamPlayer(
-        team_id=team_id,
-        player_id=player_id
+        team_id=data.team_id,
+        player_id=data.player_id
     )
 
     db.add(tp)
@@ -541,3 +559,25 @@ def get_team_players(team_id: int, db: Session = Depends(get_db)):
         }
         for p in players
     ]
+
+@router.get("/players/search")
+def search_players(q: str, db: Session = Depends(get_db)):
+    players = db.query(models.Player).filter(
+        models.Player.name.ilike(f"%{q}%")
+    ).limit(10).all()
+
+    return [
+        {"id": p.id, "name": p.name}
+        for p in players
+    ]
+
+
+@router.post("/players/quick_add")
+def quick_add_player(name: str, db: Session = Depends(get_db)):
+    player = models.Player(name=name)
+
+    db.add(player)
+    db.commit()
+    db.refresh(player)
+
+    return {"id": player.id, "name": player.name}

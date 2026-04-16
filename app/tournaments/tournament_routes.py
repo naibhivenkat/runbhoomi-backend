@@ -714,6 +714,7 @@ def create_invite(team_id: int, db: Session = Depends(get_db)):
         "link": f"https://runbhoomi.app/join-team/{code}"
     }
 
+
 @router.post("/teams/join/{code}")
 def join_team_by_code(code: str, player_id: int, db: Session = Depends(get_db)):
 
