@@ -60,6 +60,19 @@ class Player(Base):
     squads = relationship("TeamPlayer", back_populates="player")
 
 
+class EmailOTP(Base):
+    __tablename__ = "email_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, index=True)
+    otp = Column(String)
+
+    expiry = Column(Integer)
+    attempts = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # =========================
 # 🔗 TEAM PLAYER (SQUAD)
 # =========================
