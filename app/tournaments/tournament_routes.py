@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import uuid
+
 
 from app.database import models
 from app.database.db import get_db
@@ -75,16 +77,68 @@ def init_match_from_fixture(tm_id: int, db: Session = Depends(get_db)):
 
     return {"match_id": match.id}
 
+# @router.post("/{tournament_id}/add_team")
+# def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
+#     tournament = db.query(models.Tournament).filter_by(
+#         id=tournament_id
+#     ).first()
+#
+#     if not tournament:
+#         raise HTTPException(status_code=404, detail="Tournament not found")
+#
+#     # 🔥 CREATE OR GET TEAM (NEW FIX)
+#     team = db.query(Team).filter_by(name=team_name).first()
+#
+#     if not team:
+#         team = Team(name=team_name)
+#         db.add(team)
+#         db.commit()
+#         db.refresh(team)
+#
+#     # check duplicate (by team_id now)
+#     existing = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         team_id=team.id
+#     ).first()
+#
+#     if existing:
+#         raise HTTPException(status_code=400, detail="Team already exists")
+#
+#     # check max teams
+#     count = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id
+#     ).count()
+#
+#     if count >= tournament.total_teams:
+#         raise HTTPException(status_code=400, detail="Max teams reached")
+#
+#     entry = TournamentTeam(
+#         tournament_id=tournament_id,
+#         team_id=team.id,
+#         status="pending"
+#     )
+#
+#     db.add(entry)
+#
+#     # keep points same (no break)
+#     points = TournamentPoints(
+#         tournament_id=tournament_id,
+#         team_name=team_name
+#     )
+#     db.add(points)
+#
+#     db.commit()
+#
+#     return {"message": "Team added"}
+
 @router.post("/{tournament_id}/add_team")
 def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
-    tournament = db.query(models.Tournament).filter_by(
-        id=tournament_id
-    ).first()
+    tournament = db.query(models.Tournament).filter_by(id=tournament_id).first()
 
     if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+        raise HTTPException(404, "Tournament not found")
 
-    # 🔥 CREATE OR GET TEAM (NEW FIX)
+    # create or get team
     team = db.query(Team).filter_by(name=team_name).first()
 
     if not team:
@@ -93,42 +147,39 @@ def add_team(tournament_id: int, team_name: str, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(team)
 
-    # check duplicate (by team_id now)
+    # check duplicate
     existing = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team.id
     ).first()
 
     if existing:
-        raise HTTPException(status_code=400, detail="Team already exists")
+        raise HTTPException(400, "Team already exists")
 
-    # check max teams
+    # max teams check
     count = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id
     ).count()
 
     if count >= tournament.total_teams:
-        raise HTTPException(status_code=400, detail="Max teams reached")
+        raise HTTPException(400, "Max teams reached")
 
     entry = TournamentTeam(
         tournament_id=tournament_id,
         team_id=team.id,
-        status="pending"
+        status="approved"  # ✅ FIX
     )
 
     db.add(entry)
 
-    # keep points same (no break)
-    points = TournamentPoints(
+    db.add(TournamentPoints(
         tournament_id=tournament_id,
-        team_name=team_name
-    )
-    db.add(points)
+        team_name=team.name
+    ))
 
     db.commit()
 
     return {"message": "Team added"}
-
 
 @router.get("/")
 def get_tournaments(db: Session = Depends(get_db)):
@@ -152,6 +203,109 @@ def get_tournaments(db: Session = Depends(get_db)):
 
 
 @router.post("/{tournament_id}/generate_fixtures")
+# def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
+#     tournament = db.query(models.Tournament).get(tournament_id)
+#
+#     if not tournament:
+#         raise HTTPException(404, "Tournament not found")
+#
+#     teams = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         status="approved"
+#     ).all()
+#
+#     if not teams:
+#         raise HTTPException(400, "No approved teams")
+#
+#     # ✅ IMPORTANT: prevent duplicate fixtures
+#     existing = db.query(TournamentMatch).filter_by(
+#         tournament_id=tournament_id
+#     ).first()
+#
+#     if existing:
+#         raise HTTPException(400, "Fixtures already generated")
+#
+#     # =========================
+#     # 🧠 LEAGUE / HYBRID
+#     # =========================
+#     if tournament.format in ["league", "hybrid"]:
+#
+#         groups = create_groups(db, tournament_id, teams)
+#
+#         # ✅ GROUP BASED
+#         if groups:
+#             for g in groups:
+#                 group_teams = db.query(GroupTeam).filter_by(
+#                     group_id=g.id
+#                 ).all()
+#
+#                 ids = [gt.team_id for gt in group_teams]
+#
+#                 fixtures = round_robin(ids)
+#
+#                 for a, b in fixtures:
+#                     db.add(TournamentMatch(
+#                         tournament_id=tournament_id,
+#
+#                         # ✅ BOTH (IMPORTANT FOR UI + OLD CODE)
+#                         team_a_id=a,
+#                         team_b_id=b,
+#                         team_a=str(a),
+#                         team_b=str(b),
+#
+#                         group_id=g.id,
+#                         match_type="league",
+#                         round=1
+#                     ))
+#
+#         # ✅ NO GROUP
+#         else:
+#             ids = [t.team_id for t in teams]
+#
+#             fixtures = round_robin(ids)
+#
+#             for a, b in fixtures:
+#                 db.add(TournamentMatch(
+#                     tournament_id=tournament_id,
+#
+#                     # ✅ BOTH
+#                     team_a_id=a,
+#                     team_b_id=b,
+#                     team_a=str(a),
+#                     team_b=str(b),
+#
+#                     match_type="league",
+#                     round=1
+#                 ))
+#
+#     # =========================
+#     # 🧠 KNOCKOUT
+#     # =========================
+#     elif tournament.format == "knockout":
+#
+#         ids = [t.team_id for t in teams]
+#
+#         fixtures = generate_knockout(ids)
+#
+#         for a, b in fixtures:
+#             db.add(TournamentMatch(
+#                 tournament_id=tournament_id,
+#
+#                 team_a_id=a,
+#                 team_b_id=b,
+#                 team_a=str(a) if a else "BYE",
+#                 team_b=str(b) if b else "BYE",
+#
+#                 match_type="knockout",
+#                 round=1
+#             ))
+#
+#     db.commit()
+#
+#     return {"message": "Fixtures created successfully"}
+#
+
+@router.post("/{tournament_id}/generate_fixtures")
 def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     tournament = db.query(models.Tournament).get(tournament_id)
 
@@ -163,88 +317,56 @@ def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
         status="approved"
     ).all()
 
-    if not teams:
-        raise HTTPException(400, "No approved teams")
+    if len(teams) < 2:
+        raise HTTPException(400, "Not enough teams")
 
-    # ✅ IMPORTANT: prevent duplicate fixtures
-    existing = db.query(TournamentMatch).filter_by(
-        tournament_id=tournament_id
-    ).first()
+    # ✅ AUTO DELETE OLD FIXTURES
+    db.query(TournamentMatch).filter(
+        TournamentMatch.tournament_id == tournament_id
+    ).delete(synchronize_session=False)
 
-    if existing:
-        raise HTTPException(400, "Fixtures already generated")
+    db.commit()
+
+    ids = [t.team_id for t in teams]
 
     # =========================
-    # 🧠 LEAGUE / HYBRID
+    # LEAGUE
     # =========================
     if tournament.format in ["league", "hybrid"]:
 
-        groups = create_groups(db, tournament_id, teams)
+        fixtures = round_robin(ids)
 
-        # ✅ GROUP BASED
-        if groups:
-            for g in groups:
-                group_teams = db.query(GroupTeam).filter_by(
-                    group_id=g.id
-                ).all()
+        for a, b in fixtures:
+            teamA = db.query(Team).get(a)
+            teamB = db.query(Team).get(b)
 
-                ids = [gt.team_id for gt in group_teams]
-
-                fixtures = round_robin(ids)
-
-                for a, b in fixtures:
-                    db.add(TournamentMatch(
-                        tournament_id=tournament_id,
-
-                        # ✅ BOTH (IMPORTANT FOR UI + OLD CODE)
-                        team_a_id=a,
-                        team_b_id=b,
-                        team_a=str(a),
-                        team_b=str(b),
-
-                        group_id=g.id,
-                        match_type="league",
-                        round=1
-                    ))
-
-        # ✅ NO GROUP
-        else:
-            ids = [t.team_id for t in teams]
-
-            fixtures = round_robin(ids)
-
-            for a, b in fixtures:
-                db.add(TournamentMatch(
-                    tournament_id=tournament_id,
-
-                    # ✅ BOTH
-                    team_a_id=a,
-                    team_b_id=b,
-                    team_a=str(a),
-                    team_b=str(b),
-
-                    match_type="league",
-                    round=1
-                ))
+            db.add(TournamentMatch(
+                tournament_id=tournament_id,
+                team_a_id=a,
+                team_b_id=b,
+                team_a=teamA.name if teamA else "TBD",
+                team_b=teamB.name if teamB else "TBD",
+                match_type="league",
+                round=1
+            ))
 
     # =========================
-    # 🧠 KNOCKOUT
+    # KNOCKOUT
     # =========================
     elif tournament.format == "knockout":
-
-        ids = [t.team_id for t in teams]
 
         fixtures = generate_knockout(ids)
 
         for a, b in fixtures:
+            teamA = db.query(Team).get(a) if a else None
+            teamB = db.query(Team).get(b) if b else None
+
             db.add(TournamentMatch(
                 tournament_id=tournament_id,
-
                 team_a_id=a,
                 team_b_id=b,
-                team_a=str(a) if a else "BYE",
-                team_b=str(b) if b else "BYE",
-
+                team_a=teamA.name if teamA else "BYE",
+                team_b=teamB.name if teamB else "BYE",
                 match_type="knockout",
                 round=1
             ))
@@ -252,7 +374,6 @@ def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Fixtures created successfully"}
-
 
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: int, db: Session = Depends(get_db)):
@@ -306,33 +427,68 @@ def generate_knockouts(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Semis created"}
 
 
+# @router.delete("/{tournament_id}/fixtures/upcoming")
+# def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
+#
+#     matches = db.query(models.TournamentMatch).filter(
+#         models.TournamentMatch.tournament_id == tournament_id,
+#         models.TournamentMatch.winner == None,
+#         models.TournamentMatch.match_id == None  # not started yet
+#     ).all()
+#
+#     if not matches:
+#         return {"message": "No upcoming matches to delete"}
+#
+#     deleted_count = len(matches)
+#
+#     for match in matches:
+#         db.delete(match)
+#
+#     db.commit()
+#
+#     return {
+#         "message": "Upcoming fixtures deleted",
+#         "deleted": deleted_count
+#     }
+
+
 @router.delete("/{tournament_id}/fixtures/upcoming")
 def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
 
-    matches = db.query(models.TournamentMatch).filter(
-        models.TournamentMatch.tournament_id == tournament_id,
-        models.TournamentMatch.winner == None,
-        models.TournamentMatch.match_id == None  # not started yet
-    ).all()
-
-    if not matches:
-        return {"message": "No upcoming matches to delete"}
-
-    deleted_count = len(matches)
-
-    for match in matches:
-        db.delete(match)
+    deleted = db.query(TournamentMatch).filter(
+        TournamentMatch.tournament_id == tournament_id,
+        TournamentMatch.match_id == None,
+        TournamentMatch.winner == None
+    ).delete(synchronize_session=False)
 
     db.commit()
 
     return {
         "message": "Upcoming fixtures deleted",
-        "deleted": deleted_count
+        "deleted": deleted
     }
+
+
+# @router.get("/{tournament_id}/teams")
+# def get_teams(tournament_id: int, db: Session = Depends(get_db)):
+#     teams = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         status="approved"
+#     ).all()
+#
+#     return [
+#         {
+#             "id": t.id,  # IMPORTANT: tournament team id
+#             "team_id": t.team.id,
+#             "team_name": t.team.name
+#         }
+#         for t in teams
+#     ]
 
 
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):
+
     teams = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         status="approved"
@@ -340,27 +496,43 @@ def get_teams(tournament_id: int, db: Session = Depends(get_db)):
 
     return [
         {
-            "id": t.id,  # IMPORTANT: tournament team id
             "team_id": t.team.id,
             "team_name": t.team.name
         }
         for t in teams
     ]
 
+# @router.delete("/teams/{team_id}")
+# def delete_team(team_id: int, db: Session = Depends(get_db)):
+#     entry = db.query(TournamentTeam).filter(
+#         TournamentTeam.id == team_id
+#     ).first()
+#
+#     if not entry:
+#         raise HTTPException(status_code=404, detail="Team not found")
+#
+#     db.delete(entry)
+#     db.commit()
+#
+#     return {"message": "Team deleted"}
 
 @router.delete("/teams/{team_id}")
 def delete_team(team_id: int, db: Session = Depends(get_db)):
-    entry = db.query(TournamentTeam).filter(
-        TournamentTeam.id == team_id
-    ).first()
 
-    if not entry:
-        raise HTTPException(status_code=404, detail="Team not found")
+    # remove mapping
+    db.query(TournamentTeam).filter(
+        TournamentTeam.team_id == team_id
+    ).delete(synchronize_session=False)
 
-    db.delete(entry)
+    # remove fixtures
+    db.query(TournamentMatch).filter(
+        (TournamentMatch.team_a_id == team_id) |
+        (TournamentMatch.team_b_id == team_id)
+    ).delete(synchronize_session=False)
+
     db.commit()
 
-    return {"message": "Team deleted"}
+    return {"message": "Team removed"}
 
 
 @router.post("/teams/create")
@@ -482,30 +654,47 @@ def next_round(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Next round created"}
 
 
+# @router.get("/{tournament_id}/matches")
+# def get_matches(tournament_id: int, db: Session = Depends(get_db)):
+#     matches = db.query(TournamentMatch).filter_by(
+#         tournament_id=tournament_id
+#     ).all()
+#
+#     result = []
+#
+#     for m in matches:
+#         teamA = db.query(models.Team).get(m.team_a_id) if m.team_a_id else None
+#         teamB = db.query(models.Team).get(m.team_b_id) if m.team_b_id else None
+#
+#         result.append({
+#             "id": m.id,
+#             "team_a": teamA.name if teamA else m.team_a,
+#             "team_b": teamB.name if teamB else m.team_b,
+#             "stage": m.match_type,
+#             "winner": m.winner
+#         })
+#
+#     return result
+
+
 @router.get("/{tournament_id}/matches")
 def get_matches(tournament_id: int, db: Session = Depends(get_db)):
+
     matches = db.query(TournamentMatch).filter_by(
         tournament_id=tournament_id
     ).all()
 
-    result = []
-
-    for m in matches:
-        teamA = db.query(models.Team).get(m.team_a_id) if m.team_a_id else None
-        teamB = db.query(models.Team).get(m.team_b_id) if m.team_b_id else None
-
-        result.append({
+    return [
+        {
             "id": m.id,
-            "team_a": teamA.name if teamA else m.team_a,
-            "team_b": teamB.name if teamB else m.team_b,
+            "team_a": m.team_a,
+            "team_b": m.team_b,
             "stage": m.match_type,
             "winner": m.winner
-        })
+        }
+        for m in matches
+    ]
 
-    return result
-
-
-import uuid
 
 @router.post("/teams/{team_id}/invite")
 def create_invite(team_id: int, db: Session = Depends(get_db)):
