@@ -306,22 +306,29 @@ def generate_knockouts(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Semis created"}
 
 
-# @router.get("/{tournament_id}/matches")
-# def get_matches(tournament_id: int, db: Session = Depends(get_db)):
-#     matches = db.query(TournamentMatch).filter_by(
-#         tournament_id=tournament_id
-#     ).all()
-#
-#     return [
-#         {
-#             "id": m.id,
-#             "team_a": m.team_a,
-#             "team_b": m.team_b,
-#             "stage": m.stage,
-#             "winner": m.winner
-#         }
-#         for m in matches
-#     ]
+@router.delete("/{tournament_id}/fixtures/upcoming")
+def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
+
+    matches = db.query(models.TournamentMatch).filter(
+        models.TournamentMatch.tournament_id == tournament_id,
+        models.TournamentMatch.winner == None,   # not completed
+        models.TournamentMatch.is_live == False  # not live
+    ).all()
+
+    if not matches:
+        return {"message": "No upcoming matches to delete"}
+
+    deleted_count = len(matches)
+
+    for match in matches:
+        db.delete(match)
+
+    db.commit()
+
+    return {
+        "message": "Upcoming fixtures deleted",
+        "deleted": deleted_count
+    }
 
 
 @router.get("/{tournament_id}/teams")
