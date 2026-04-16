@@ -31,8 +31,13 @@ class Player(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     name = Column(String(100), nullable=False)
-    phone = Column(String(15), nullable=False)
-    email = Column(String(120), unique=True, index=True, nullable=False)
+    # phone = Column(String(15), nullable=False)
+    # email = Column(String(120), unique=True, index=True, nullable=False)
+    # password_hash = Column(String, nullable=False)
+    email = Column(String(120), unique=True, nullable=True)
+    password_hash = Column(String, nullable=True)
+    phone = Column(String(15), nullable=True)
+
     gender = Column(String(10), nullable=True)
 
     city = Column(String, nullable=True, index=True)
@@ -46,7 +51,7 @@ class Player(Base):
 
     dob = Column(Date, nullable=True)
 
-    password_hash = Column(String, nullable=False)
+
     profile_photo = Column(String, nullable=True)
 
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=True)

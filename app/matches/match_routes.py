@@ -19,6 +19,7 @@ class AddPlayerRequest(BaseModel):
 
 class QuickAddPlayerRequest(BaseModel):
     name: str
+    phone: str | None = None
 
 # =========================
 # CREATE MATCH
@@ -564,14 +565,32 @@ def get_team_players(team_id: int, db: Session = Depends(get_db)):
         for p in players
     ]
 
+# @router.get("/players/search")
+# def search_players(q: str, db: Session = Depends(get_db)):
+#     players = db.query(models.Player).filter(
+#         models.Player.name.ilike(f"%{q}%")
+#     ).limit(10).all()
+#
+#     return [
+#         {"id": p.id, "name": p.name}
+#         for p in players
+#     ]
+
 @router.get("/players/search")
 def search_players(q: str, db: Session = Depends(get_db)):
     players = db.query(models.Player).filter(
-        models.Player.name.ilike(f"%{q}%")
+        or_(
+            models.Player.name.ilike(f"%{q}%"),
+            models.Player.phone.ilike(f"%{q}%")
+        )
     ).limit(10).all()
 
     return [
-        {"id": p.id, "name": p.name}
+        {
+            "id": p.id,
+            "name": p.name,
+            "phone": p.phone
+        }
         for p in players
     ]
 
@@ -579,13 +598,25 @@ def search_players(q: str, db: Session = Depends(get_db)):
 @router.post("/players/quick_add")
 def quick_add_player(data: QuickAddPlayerRequest, db: Session = Depends(get_db)):
 
-    player = models.Player(name=data.name)
+    # 1. If phone exists → return existing player
+    if data.phone:
+        existing = db.query(models.Player).filter(
+            models.Player.phone == data.phone
+        ).first()
+
+        if existing:
+            return {"id": existing.id, "name": existing.name}
+
+    # 2. Create new quick player
+    player = models.Player(
+        name=data.name,
+        phone=data.phone,
+        email=None,                # ❗ no fake email
+        password_hash=None         # ❗ no password
+    )
 
     db.add(player)
     db.commit()
     db.refresh(player)
 
-    return {
-        "id": player.id,
-        "name": player.name
-    }
+    return {"id": player.id, "name": player.name}
