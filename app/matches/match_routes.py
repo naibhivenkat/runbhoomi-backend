@@ -16,6 +16,10 @@ class AddPlayerRequest(BaseModel):
     team_id: int
     player_id: int
 
+
+class QuickAddPlayerRequest(BaseModel):
+    name: str
+
 # =========================
 # CREATE MATCH
 # =========================
@@ -573,11 +577,15 @@ def search_players(q: str, db: Session = Depends(get_db)):
 
 
 @router.post("/players/quick_add")
-def quick_add_player(name: str, db: Session = Depends(get_db)):
-    player = models.Player(name=name)
+def quick_add_player(data: QuickAddPlayerRequest, db: Session = Depends(get_db)):
+
+    player = models.Player(name=data.name)
 
     db.add(player)
     db.commit()
     db.refresh(player)
 
-    return {"id": player.id, "name": player.name}
+    return {
+        "id": player.id,
+        "name": player.name
+    }
