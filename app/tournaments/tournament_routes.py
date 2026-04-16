@@ -311,8 +311,8 @@ def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
 
     matches = db.query(models.TournamentMatch).filter(
         models.TournamentMatch.tournament_id == tournament_id,
-        models.TournamentMatch.winner == None,   # not completed
-        models.TournamentMatch.is_live == False  # not live
+        models.TournamentMatch.winner == None,
+        models.TournamentMatch.match_id == None  # not started yet
     ).all()
 
     if not matches:
