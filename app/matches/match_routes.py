@@ -487,15 +487,12 @@ def update_result(
     return {"message": "Result updated"}
 
 
+
 # @router.post("/add_player_to_team")
-# def add_player_to_team(
-#         team_id: int,
-#         player_id: int,
-#         db: Session = Depends(get_db)
-# ):
+# def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
 #     tp = models.TeamPlayer(
-#         team_id=team_id,
-#         player_id=player_id
+#         team_id=data.team_id,
+#         player_id=data.player_id
 #     )
 #
 #     db.add(tp)
@@ -506,6 +503,16 @@ def update_result(
 
 @router.post("/add_player_to_team")
 def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
+
+    # 🚫 prevent duplicate
+    existing = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == data.team_id,
+        models.TeamPlayer.player_id == data.player_id
+    ).first()
+
+    if existing:
+        return {"message": "Player already in team"}
+
     tp = models.TeamPlayer(
         team_id=data.team_id,
         player_id=data.player_id
@@ -515,7 +522,6 @@ def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Player added to team"}
-
 
 @router.post("/{match_id}/set_playing_xi")
 def set_playing_xi(
@@ -549,53 +555,69 @@ def set_playing_xi(
 
 @router.get("/teams/{team_id}/players")
 def get_team_players(team_id: int, db: Session = Depends(get_db)):
-    team = db.query(models.Team).filter(
-        models.Team.id == team_id
-    ).first()
 
-    if not team:
-        raise HTTPException(404, "Team not found")
-
-    players = db.query(models.Player).filter(
-        models.Player.team_id == team_id
+    team_players = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == team_id
     ).all()
 
-    return [
-        {
-            "id": p.id,
-            "name": p.name
-        }
-        for p in players
-    ]
+    result = []
+
+    for tp in team_players:
+        player = db.query(models.Player).get(tp.player_id)
+
+        if player:
+            result.append({
+                "id": player.id,
+                "name": player.name
+            })
+
+    return result
 
 # @router.get("/players/search")
 # def search_players(q: str, db: Session = Depends(get_db)):
 #     players = db.query(models.Player).filter(
-#         models.Player.name.ilike(f"%{q}%")
+#         or_(
+#             models.Player.name.ilike(f"%{q}%"),
+#             models.Player.phone.ilike(f"%{q}%")
+#         )
 #     ).limit(10).all()
 #
 #     return [
-#         {"id": p.id, "name": p.name}
+#         {
+#             "id": p.id,
+#             "name": p.name,
+#             "phone": p.phone
+#         }
 #         for p in players
 #     ]
 
+
 @router.get("/players/search")
-def search_players(q: str, db: Session = Depends(get_db)):
+def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
+
     players = db.query(models.Player).filter(
         or_(
             models.Player.name.ilike(f"%{q}%"),
             models.Player.phone.ilike(f"%{q}%")
         )
-    ).limit(10).all()
+    ).all()
 
-    return [
-        {
+    result = []
+
+    for p in players:
+        already = db.query(models.TeamPlayer).filter(
+            models.TeamPlayer.team_id == team_id,
+            models.TeamPlayer.player_id == p.id
+        ).first()
+
+        result.append({
             "id": p.id,
             "name": p.name,
-            "phone": p.phone
-        }
-        for p in players
-    ]
+            "phone": p.phone,
+            "already_added": True if already else False
+        })
+
+    return result
 
 
 @router.post("/players/quick_add")
