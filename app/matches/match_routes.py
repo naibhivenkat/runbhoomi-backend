@@ -449,6 +449,7 @@ def add_ball(
             "is_wicket": wicket
         }
     }
+
 @router.post("/{match_id}/result")
 def update_result(
         match_id: int,
@@ -502,6 +503,8 @@ def update_result(
 #
 #     return {"message": "Player added to team"}
 
+
+@router.post("/add_player_to_team")
 def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
     tp = models.TeamPlayer(
         team_id=data.team_id,
