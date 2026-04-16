@@ -501,10 +501,31 @@ def update_result(
 #     return {"message": "Player added to team"}
 
 
+# @router.post("/add_player_to_team")
+# def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
+#
+#     # 🚫 prevent duplicate
+#     existing = db.query(models.TeamPlayer).filter(
+#         models.TeamPlayer.team_id == data.team_id,
+#         models.TeamPlayer.player_id == data.player_id
+#     ).first()
+#
+#     if existing:
+#         return {"message": "Player already in team"}
+#
+#     tp = models.TeamPlayer(
+#         team_id=data.team_id,
+#         player_id=data.player_id
+#     )
+#
+#     db.add(tp)
+#     db.commit()
+#
+#     return {"message": "Player added to team"}
+
 @router.post("/add_player_to_team")
 def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
 
-    # 🚫 prevent duplicate
     existing = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == data.team_id,
         models.TeamPlayer.player_id == data.player_id
@@ -521,7 +542,7 @@ def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
     db.add(tp)
     db.commit()
 
-    return {"message": "Player added to team"}
+    return {"message": "Player added"}
 
 @router.post("/{match_id}/set_playing_xi")
 def set_playing_xi(
@@ -592,13 +613,43 @@ def get_team_players(team_id: int, db: Session = Depends(get_db)):
 #     ]
 
 
+# @router.get("/players/search")
+# def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
+#
+#     players = db.query(models.Player).filter(
+#         or_(
+#             models.Player.name.ilike(f"%{q}%"),
+#             models.Player.phone.ilike(f"%{q}%")
+#         )
+#     ).all()
+#
+#     result = []
+#
+#     for p in players:
+#         already = db.query(models.TeamPlayer).filter(
+#             models.TeamPlayer.team_id == team_id,
+#             models.TeamPlayer.player_id == p.id
+#         ).first()
+#
+#         result.append({
+#             "id": p.id,
+#             "name": p.name,
+#             "phone": p.phone,
+#             "already_added": True if already else False
+#         })
+#
+#     return result
+
+from sqlalchemy import or_
+
 @router.get("/players/search")
 def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
 
     players = db.query(models.Player).filter(
         or_(
             models.Player.name.ilike(f"%{q}%"),
-            models.Player.phone.ilike(f"%{q}%")
+            models.Player.phone.ilike(f"%{q}%"),
+            models.Player.email.ilike(f"%{q}%"),
         )
     ).all()
 
@@ -614,6 +665,7 @@ def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
             "id": p.id,
             "name": p.name,
             "phone": p.phone,
+            "email": p.email,
             "already_added": True if already else False
         })
 
