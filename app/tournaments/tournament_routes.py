@@ -343,28 +343,66 @@ def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
         "deleted": deleted
     }
 
+#
+# @router.get("/{tournament_id}/teams")
+# def get_teams(tournament_id: int, db: Session = Depends(get_db)):
+#     teams = db.query(models.TournamentTeam).filter(
+#         models.TournamentTeam.tournament_id == tournament_id,
+#         models.TournamentTeam.status == "approved"
+#     ).all()
+#
+#     result = []
+#
+#     for t in teams:
+#         team = t.team
+#
+#         # ✅ COUNT PLAYERS FROM TEAMPLAYER
+#         count = db.query(models.TeamPlayer).filter(
+#             models.TeamPlayer.team_id == team.id
+#         ).count()
+#
+#         result.append({
+#             "team_id": team.id,
+#             "team_name": team.name,
+#             "player_count": count
+#         })
+#
+#     return result
+
 
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):
-    teams = db.query(models.TournamentTeam).filter(
-        models.TournamentTeam.tournament_id == tournament_id,
-        models.TournamentTeam.status == "approved"
+
+    teams = db.query(TournamentTeam).filter_by(
+        tournament_id=tournament_id,
+        status="approved"
     ).all()
 
     result = []
 
     for t in teams:
-        team = t.team
+        team = db.query(Team).get(t.team_id)
 
-        # ✅ COUNT PLAYERS FROM TEAMPLAYER
-        count = db.query(models.TeamPlayer).filter(
-            models.TeamPlayer.team_id == team.id
-        ).count()
+        # 🔥 find group mapping for THIS tournament only
+        group_map = db.query(GroupTeam).join(
+            TournamentGroup,
+            GroupTeam.group_id == TournamentGroup.id
+        ).filter(
+            GroupTeam.team_id == t.team_id,
+            TournamentGroup.tournament_id == tournament_id
+        ).first()
+
+        group_name = None
+
+        if group_map:
+            group = db.query(TournamentGroup).get(group_map.group_id)
+            if group:
+                group_name = group.name
 
         result.append({
-            "team_id": team.id,
-            "team_name": team.name,
-            "player_count": count
+            "team_id": t.team_id,
+            "team_name": team.name if team else "Unknown",
+            "group_name": group_name or "No Group"
         })
 
     return result
