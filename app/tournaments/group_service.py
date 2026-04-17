@@ -65,3 +65,19 @@ def calculate_nrr(p):
     return (p.runs_scored / p.overs_faced) - (
         p.runs_conceded / p.overs_bowled
     )
+
+
+def paired_rounds(team_ids):
+    matches = []
+
+    # Round 1: (1 vs 2), (3 vs 4)
+    for i in range(0, len(team_ids), 2):
+        if i + 1 < len(team_ids):
+            matches.append((team_ids[i], team_ids[i+1]))
+
+    # Round 2: cross matches
+    if len(team_ids) >= 4:
+        matches.append((team_ids[0], team_ids[2]))
+        matches.append((team_ids[1], team_ids[3]))
+
+    return matches
