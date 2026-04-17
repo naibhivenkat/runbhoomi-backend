@@ -1,16 +1,14 @@
 from app.database.models import TournamentGroup, GroupTeam
 
-def create_groups(db, tournament_id, teams):
+def create_groups(db, tournament_id, teams, group_count):
     n = len(teams)
 
-    if n <= 6:
+    if n < 2:
         return None
 
-    # decide number of groups
-    group_count = 2 if n <= 10 else 3
-
-    # 🔥 create groups
     groups = []
+
+    # create groups
     for i in range(group_count):
         g = TournamentGroup(
             tournament_id=tournament_id,
@@ -21,7 +19,7 @@ def create_groups(db, tournament_id, teams):
         db.refresh(g)
         groups.append(g)
 
-    # 🔥 chunk teams (SEQUENTIAL DISTRIBUTION)
+    # 🔥 sequential distribution (CORRECT)
     chunk_size = n // group_count
     remainder = n % group_count
 
@@ -43,8 +41,6 @@ def create_groups(db, tournament_id, teams):
 
     db.commit()
     return groups
-
-
 def round_robin(team_ids):
     fixtures = []
 
