@@ -807,37 +807,6 @@ def next_round(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Next round created"}
 
 
-# @router.get("/{tournament_id}/matches")
-# def get_matches(tournament_id: int, db: Session = Depends(get_db)):
-#     matches = db.query(TournamentMatch).filter_by(
-#         tournament_id=tournament_id
-#     ).all()
-#
-#     result = []
-#
-#     for m in matches:
-#         teamA = db.query(Team).get(m.team_a_id) if m.team_a_id else None
-#         teamB = db.query(Team).get(m.team_b_id) if m.team_b_id else None
-#
-#         result.append({
-#             "id": m.id,
-#             "team_a_id": m.team_a_id,
-#             "team_b_id": m.team_b_id,
-#
-#             # ✅ ALWAYS SEND NAMES FROM TEAM TABLE
-#             "team_a": teamA.name if teamA else "TBD",
-#             "team_b": teamB.name if teamB else "TBD",
-#
-#             "stage": m.match_type,
-#             "winner": m.winner,
-#
-#             # optional but useful
-#             "is_live": getattr(m, "is_live", False),
-#             "match_time": getattr(m, "match_time", None),
-#         })
-#
-#     return result
-
 @router.get("/{tournament_id}/matches")
 def get_matches(tournament_id: int, db: Session = Depends(get_db)):
     matches = db.query(TournamentMatch).filter_by(
@@ -855,18 +824,17 @@ def get_matches(tournament_id: int, db: Session = Depends(get_db)):
             "team_a_id": m.team_a_id,
             "team_b_id": m.team_b_id,
 
-            # ✅ ALWAYS FETCH FROM TEAM TABLE
             "team_a": teamA.name if teamA else "TBD",
             "team_b": teamB.name if teamB else "TBD",
 
             "stage": m.match_type,
             "winner": m.winner,
 
-            # 🔥 IMPORTANT (THIS WAS MISSING / WRONG)
+
             "group_id": m.group_id,
+            "match_time": m.match_time,
 
             "is_live": False,
-            "match_time": None,
         })
 
     return result
