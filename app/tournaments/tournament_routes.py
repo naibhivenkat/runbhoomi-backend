@@ -6,7 +6,7 @@ import uuid
 from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam, TeamInvite, \
-    TeamPlayer
+    TeamPlayer, TournamentGroup
 from app.tournaments.group_service import create_groups, round_robin, generate_knockout
 
 router = APIRouter(prefix="/tournaments")
@@ -149,6 +149,78 @@ def get_tournaments(db: Session = Depends(get_db)):
     ]
 
 
+#@router.post("/{tournament_id}/generate_fixtures")
+# def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
+#     tournament = db.query(models.Tournament).get(tournament_id)
+#
+#     if not tournament:
+#         raise HTTPException(404, "Tournament not found")
+#
+#     teams = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         status="approved"
+#     ).all()
+#
+#     if len(teams) < 2:
+#         raise HTTPException(400, "Not enough teams")
+#
+#     # ✅ AUTO DELETE OLD FIXTURES
+#     db.query(TournamentMatch).filter(
+#         TournamentMatch.tournament_id == tournament_id
+#     ).delete(synchronize_session=False)
+#
+#     db.commit()
+#
+#     ids = [t.team_id for t in teams]
+#
+#     # =========================
+#     # LEAGUE
+#     # =========================
+#     if tournament.format in ["league", "hybrid"]:
+#
+#         fixtures = round_robin(ids)
+#
+#         for a, b in fixtures:
+#             teamA = db.query(Team).get(a)
+#             teamB = db.query(Team).get(b)
+#
+#             db.add(TournamentMatch(
+#                 tournament_id=tournament_id,
+#                 team_a_id=a,
+#                 team_b_id=b,
+#                 team_a=teamA.name if teamA else "TBD",
+#                 team_b=teamB.name if teamB else "TBD",
+#                 match_type="league",
+#                 round=1
+#             ))
+#
+#     # =========================
+#     # KNOCKOUT
+#     # =========================
+#     elif tournament.format == "knockout":
+#
+#         fixtures = generate_knockout(ids)
+#
+#         for a, b in fixtures:
+#             teamA = db.query(Team).get(a) if a else None
+#             teamB = db.query(Team).get(b) if b else None
+#
+#             db.add(TournamentMatch(
+#                 tournament_id=tournament_id,
+#                 team_a_id=a,
+#                 team_b_id=b,
+#                 team_a=teamA.name if teamA else "BYE",
+#                 team_b=teamB.name if teamB else "BYE",
+#                 match_type="knockout",
+#                 round=1
+#             ))
+#
+#     db.commit()
+#
+#     return {"message": "Fixtures created successfully"}
+#
+
+
 @router.post("/{tournament_id}/generate_fixtures")
 def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     tournament = db.query(models.Tournament).get(tournament_id)
@@ -164,9 +236,15 @@ def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     if len(teams) < 2:
         raise HTTPException(400, "Not enough teams")
 
-    # ✅ AUTO DELETE OLD FIXTURES
+    # ✅ DELETE OLD FIXTURES
     db.query(TournamentMatch).filter(
         TournamentMatch.tournament_id == tournament_id
+    ).delete(synchronize_session=False)
+
+    # ✅ DELETE OLD GROUPS (VERY IMPORTANT 🔥)
+    db.query(GroupTeam).delete(synchronize_session=False)
+    db.query(TournamentGroup).filter(
+        TournamentGroup.tournament_id == tournament_id
     ).delete(synchronize_session=False)
 
     db.commit()
@@ -174,28 +252,64 @@ def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     ids = [t.team_id for t in teams]
 
     # =========================
-    # LEAGUE
+    # 🟢 LEAGUE / HYBRID (WITH GROUPS)
     # =========================
     if tournament.format in ["league", "hybrid"]:
 
-        fixtures = round_robin(ids)
+        # ✅ CREATE GROUPS
+        groups = create_groups(db, tournament_id, teams)
 
-        for a, b in fixtures:
-            teamA = db.query(Team).get(a)
-            teamB = db.query(Team).get(b)
+        # =========================
+        # ❌ SMALL TOURNAMENT → NO GROUPS
+        # =========================
+        if not groups:
+            fixtures = round_robin(ids)
 
-            db.add(TournamentMatch(
-                tournament_id=tournament_id,
-                team_a_id=a,
-                team_b_id=b,
-                team_a=teamA.name if teamA else "TBD",
-                team_b=teamB.name if teamB else "TBD",
-                match_type="league",
-                round=1
-            ))
+            for a, b in fixtures:
+                teamA = db.query(Team).get(a)
+                teamB = db.query(Team).get(b)
+
+                db.add(TournamentMatch(
+                    tournament_id=tournament_id,
+                    team_a_id=a,
+                    team_b_id=b,
+                    team_a=teamA.name if teamA else "TBD",
+                    team_b=teamB.name if teamB else "TBD",
+                    match_type="league",
+                    round=1
+                ))
+
+        # =========================
+        # ✅ GROUP BASED FIXTURES
+        # =========================
+        else:
+            for g in groups:
+
+                group_teams = db.query(GroupTeam).filter_by(
+                    group_id=g.id
+                ).all()
+
+                team_ids = [gt.team_id for gt in group_teams]
+
+                fixtures = round_robin(team_ids)
+
+                for a, b in fixtures:
+                    teamA = db.query(Team).get(a)
+                    teamB = db.query(Team).get(b)
+
+                    db.add(TournamentMatch(
+                        tournament_id=tournament_id,
+                        team_a_id=a,
+                        team_b_id=b,
+                        team_a=teamA.name if teamA else "TBD",
+                        team_b=teamB.name if teamB else "TBD",
+                        match_type="league",
+                        group_id=g.id,   # 🔥 KEY FIX
+                        round=1
+                    ))
 
     # =========================
-    # KNOCKOUT
+    # 🔴 KNOCKOUT
     # =========================
     elif tournament.format == "knockout":
 
@@ -218,8 +332,6 @@ def generate_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Fixtures created successfully"}
-
-
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: int, db: Session = Depends(get_db)):
     points = db.query(TournamentPoints).filter_by(
@@ -451,24 +563,6 @@ def next_round(tournament_id: int, db: Session = Depends(get_db)):
     return {"message": "Next round created"}
 
 
-# @router.get("/{tournament_id}/matches")
-# def get_matches(tournament_id: int, db: Session = Depends(get_db)):
-#
-#     matches = db.query(TournamentMatch).filter_by(
-#         tournament_id=tournament_id
-#     ).all()
-#
-#     return [
-#         {
-#             "id": m.id,
-#             "team_a": m.team_a,
-#             "team_b": m.team_b,
-#             "stage": m.match_type,
-#             "winner": m.winner
-#         }
-#         for m in matches
-#     ]
-
 
 @router.get("/{tournament_id}/matches")
 def get_matches(tournament_id: int, db: Session = Depends(get_db)):
@@ -535,3 +629,15 @@ def join_team_by_code(code: str, player_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Joined team"}
+
+
+@router.get("/{tournament_id}/groups")
+def get_groups(tournament_id: int, db: Session = Depends(get_db)):
+    groups = db.query(TournamentGroup).filter_by(
+        tournament_id=tournament_id
+    ).all()
+
+    return [
+        {"id": g.id, "name": g.name}
+        for g in groups
+    ]
