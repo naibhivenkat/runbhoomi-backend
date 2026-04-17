@@ -505,22 +505,24 @@ def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):
 
-    teams = db.query(models.Team).filter(
-        models.Team.tournament_id == tournament_id
+    teams = db.query(models.TournamentTeam).filter(
+        models.TournamentTeam.tournament_id == tournament_id,
+        models.TournamentTeam.status == "approved"
     ).all()
 
     result = []
 
     for t in teams:
+        team = t.team
 
         # ✅ COUNT PLAYERS FROM TEAMPLAYER
         count = db.query(models.TeamPlayer).filter(
-            models.TeamPlayer.team_id == t.id
+            models.TeamPlayer.team_id == team.id
         ).count()
 
         result.append({
-            "team_id": t.id,
-            "team_name": t.name,
+            "team_id": team.id,
+            "team_name": team.name,
             "player_count": count
         })
 
