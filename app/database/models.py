@@ -275,6 +275,7 @@ class TournamentMatch(Base):
     group_id = Column(Integer, nullable=True)
     match_type = Column(String, default="league")
     round = Column(Integer, default=1)
+    match_time = Column(String, nullable=True)
 
 
 class TournamentPoints(Base):

@@ -7,7 +7,8 @@ from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam, TeamInvite, \
     TeamPlayer, TournamentGroup
-from app.tournaments.group_service import create_groups, round_robin, generate_knockout, paired_rounds
+from app.tournaments.group_service import create_groups, round_robin, generate_knockout, paired_rounds, \
+    get_match_duration
 from datetime import datetime, timedelta
 router = APIRouter(prefix="/tournaments")
 
@@ -274,10 +275,8 @@ def get_tournaments(db: Session = Depends(get_db)):
 #     db.commit()
 #
 #     return {"message": "Fixtures created successfully"}
-
 #
 #
-
 # @router.post("/{tournament_id}/generate_fixtures")
 # def generate_fixtures(
 #     tournament_id: int,
@@ -482,14 +481,46 @@ def generate_fixtures(
 
     db.commit()
 
-    # 🔥 ASSIGN TIME (INTERLEAVED)
-    current_time = datetime.strptime(start_time, "%H:%M")
-    duration = tournament.overs * 6
+    # # 🔥 ASSIGN TIME (INTERLEAVED)
+    # current_time = datetime.strptime(start_time, "%H:%M")
+    # duration = tournament.overs * 6
+    #
+    # grouped = {}
+    # for m in matches_created:
+    #     grouped.setdefault(m.group_id, []).append(m)
+    #
+    # order = []
+    # max_len = max(len(v) for v in grouped.values())
+    #
+    # for i in range(max_len):
+    #     for g in grouped:
+    #         if i < len(grouped[g]):
+    #             order.append(grouped[g][i])
+    #
+    # for m in order:
+    #     m.match_time = current_time.strftime("%H:%M")
+    #     current_time += timedelta(minutes=duration + gap)
+    #
+    # db.commit()
 
+    # 🔥 FETCH FROM DB (IMPORTANT FIX)
+    matches = db.query(TournamentMatch).filter_by(
+        tournament_id=tournament_id
+    ).all()
+
+    print("MATCHES COUNT:", len(matches))  # debug
+
+    # 🔥 REALISTIC DURATION
+    duration = get_match_duration(tournament.overs)
+
+    current_time = datetime.strptime(start_time, "%H:%M")
+
+    # 🔥 GROUPING
     grouped = {}
-    for m in matches_created:
+    for m in matches:
         grouped.setdefault(m.group_id, []).append(m)
 
+    # 🔥 INTERLEAVE ORDER
     order = []
     max_len = max(len(v) for v in grouped.values())
 
@@ -498,8 +529,10 @@ def generate_fixtures(
             if i < len(grouped[g]):
                 order.append(grouped[g][i])
 
+    # 🔥 ASSIGN TIME
     for m in order:
         m.match_time = current_time.strftime("%H:%M")
+        print(f"Assigning {m.team_a} vs {m.team_b} → {m.match_time}")  # debug
         current_time += timedelta(minutes=duration + gap)
 
     db.commit()

@@ -93,3 +93,18 @@ def paired_rounds(team_ids):
         matches.append((team_ids[1], team_ids[3]))
 
     return matches
+
+
+def get_match_duration(overs):
+    if overs <= 6:
+        return 45
+    elif overs <= 8:
+        return 60
+    elif overs <= 10:
+        return 75
+    elif overs <= 15:
+        return 110
+    elif overs <= 20:
+        return 160
+    else:
+        return overs * 8
