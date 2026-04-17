@@ -6,8 +6,10 @@ def create_groups(db, tournament_id, teams):
     if n <= 6:
         return None
 
+    # decide number of groups
     group_count = 2 if n <= 10 else 3
 
+    # 🔥 create groups
     groups = []
     for i in range(group_count):
         g = TournamentGroup(
@@ -19,11 +21,25 @@ def create_groups(db, tournament_id, teams):
         db.refresh(g)
         groups.append(g)
 
-    for i, t in enumerate(teams):
-        db.add(GroupTeam(
-            group_id=groups[i % group_count].id,
-            team_id=t.team_id
-        ))
+    # 🔥 chunk teams (SEQUENTIAL DISTRIBUTION)
+    chunk_size = n // group_count
+    remainder = n % group_count
+
+    start = 0
+
+    for i, group in enumerate(groups):
+        extra = 1 if i < remainder else 0
+        end = start + chunk_size + extra
+
+        group_slice = teams[start:end]
+
+        for t in group_slice:
+            db.add(GroupTeam(
+                group_id=group.id,
+                team_id=t.team_id
+            ))
+
+        start = end
 
     db.commit()
     return groups
