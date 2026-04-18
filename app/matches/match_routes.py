@@ -21,6 +21,7 @@ class QuickAddPlayerRequest(BaseModel):
     name: str
     phone: str | None = None
 
+
 # =========================
 # CREATE MATCH
 # =========================
@@ -47,7 +48,6 @@ def create_match(team_a_id: int, team_b_id: int, overs: int = 20,
 def start_match(match_id: int, striker_id: int,
                 non_striker_id: int, bowler_name: str,
                 db: Session = Depends(get_db)):
-
     match = db.query(models.Match).get(match_id)
 
     if not match:
@@ -203,8 +203,6 @@ def get_match_detail(match_id: int, db: Session = Depends(get_db)):
     }
 
 
-
-
 # =========================
 # LIVE SCORE
 # =========================
@@ -296,20 +294,21 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
         "status": match.note or "Live",
         "last_over": last_over,
         "batsmen": batsmen_data,
-        "yet_to_bat": yet_to_bat,   # ✅ NEW
+        "yet_to_bat": yet_to_bat,  # ✅ NEW
         "bowler": bowler_data,
         "extras": 0,
         "run_rate": run_rate
     }
 
+
 @router.post("/{match_id}/add_ball")
 def add_ball(
-    match_id: int,
-    runs: int = 0,
-    wicket: bool = False,
-    extra_type: str = None,
-    extra_runs: int = 0,
-    db: Session = Depends(get_db)
+        match_id: int,
+        runs: int = 0,
+        wicket: bool = False,
+        extra_type: str = None,
+        extra_runs: int = 0,
+        db: Session = Depends(get_db)
 ):
     # =========================
     # OVER LOGIC
@@ -348,7 +347,7 @@ def add_ball(
     while len(batsmen) < 2:
         new = models.Batsman(
             match_id=match_id,
-            name=f"Player {len(batsmen)+1}",
+            name=f"Player {len(batsmen) + 1}",
             is_striker=(len(batsmen) == 0)
         )
         db.add(new)
@@ -450,6 +449,7 @@ def add_ball(
         }
     }
 
+
 @router.post("/{match_id}/result")
 def update_result(
         match_id: int,
@@ -487,45 +487,8 @@ def update_result(
     return {"message": "Result updated"}
 
 
-
-# @router.post("/add_player_to_team")
-# def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
-#     tp = models.TeamPlayer(
-#         team_id=data.team_id,
-#         player_id=data.player_id
-#     )
-#
-#     db.add(tp)
-#     db.commit()
-#
-#     return {"message": "Player added to team"}
-
-
-# @router.post("/add_player_to_team")
-# def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
-#
-#     # 🚫 prevent duplicate
-#     existing = db.query(models.TeamPlayer).filter(
-#         models.TeamPlayer.team_id == data.team_id,
-#         models.TeamPlayer.player_id == data.player_id
-#     ).first()
-#
-#     if existing:
-#         return {"message": "Player already in team"}
-#
-#     tp = models.TeamPlayer(
-#         team_id=data.team_id,
-#         player_id=data.player_id
-#     )
-#
-#     db.add(tp)
-#     db.commit()
-#
-#     return {"message": "Player added to team"}
-
 @router.post("/add_player_to_team")
 def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
-
     existing = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == data.team_id,
         models.TeamPlayer.player_id == data.player_id
@@ -543,6 +506,7 @@ def add_player_to_team(data: AddPlayerRequest, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Player added"}
+
 
 @router.post("/{match_id}/set_playing_xi")
 def set_playing_xi(
@@ -573,10 +537,8 @@ def set_playing_xi(
     return {"message": "Playing XI set"}
 
 
-
 @router.get("/teams/{team_id}/players")
 def get_team_players(team_id: int, db: Session = Depends(get_db)):
-
     team_players = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == team_id
     ).all()
@@ -594,57 +556,12 @@ def get_team_players(team_id: int, db: Session = Depends(get_db)):
 
     return result
 
-# @router.get("/players/search")
-# def search_players(q: str, db: Session = Depends(get_db)):
-#     players = db.query(models.Player).filter(
-#         or_(
-#             models.Player.name.ilike(f"%{q}%"),
-#             models.Player.phone.ilike(f"%{q}%")
-#         )
-#     ).limit(10).all()
-#
-#     return [
-#         {
-#             "id": p.id,
-#             "name": p.name,
-#             "phone": p.phone
-#         }
-#         for p in players
-#     ]
-
-
-# @router.get("/players/search")
-# def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
-#
-#     players = db.query(models.Player).filter(
-#         or_(
-#             models.Player.name.ilike(f"%{q}%"),
-#             models.Player.phone.ilike(f"%{q}%")
-#         )
-#     ).all()
-#
-#     result = []
-#
-#     for p in players:
-#         already = db.query(models.TeamPlayer).filter(
-#             models.TeamPlayer.team_id == team_id,
-#             models.TeamPlayer.player_id == p.id
-#         ).first()
-#
-#         result.append({
-#             "id": p.id,
-#             "name": p.name,
-#             "phone": p.phone,
-#             "already_added": True if already else False
-#         })
-#
-#     return result
 
 from sqlalchemy import or_
 
+
 @router.get("/players/search")
 def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
-
     players = db.query(models.Player).filter(
         or_(
             models.Player.name.ilike(f"%{q}%"),
@@ -674,7 +591,6 @@ def search_players(q: str, team_id: int, db: Session = Depends(get_db)):
 
 @router.post("/players/quick_add")
 def quick_add_player(data: QuickAddPlayerRequest, db: Session = Depends(get_db)):
-
     # 1. If phone exists → return existing player
     if data.phone:
         existing = db.query(models.Player).filter(
@@ -688,8 +604,8 @@ def quick_add_player(data: QuickAddPlayerRequest, db: Session = Depends(get_db))
     player = models.Player(
         name=data.name,
         phone=data.phone,
-        email=None,                # ❗ no fake email
-        password_hash=None         # ❗ no password
+        email=None,  # ❗ no fake email
+        password_hash=None  # ❗ no password
     )
 
     db.add(player)
