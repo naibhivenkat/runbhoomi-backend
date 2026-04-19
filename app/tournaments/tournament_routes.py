@@ -274,14 +274,11 @@ def get_points(tournament_id: int, db: Session = Depends(get_db)):
     ).all()
 
     def convert_overs(overs):
-        """
-        Convert cricket overs format (e.g., 19.3) → real overs (19.5)
-        """
         if overs is None:
             return 0
 
         whole = int(overs)
-        balls = int(round((overs - whole) * 10))  # .3 → 3 balls
+        balls = int(round((overs - whole) * 10))
         return whole + (balls / 6)
 
     result = []
@@ -294,24 +291,22 @@ def get_points(tournament_id: int, db: Session = Depends(get_db)):
         if overs_faced > 0 and overs_bowled > 0:
             nrr = (p.runs_scored / overs_faced) - (p.runs_conceded / overs_bowled)
 
-        losses = p.played - p.wins
-
         result.append({
             "team": p.team_name,
-            "points": p.points,
             "played": p.played,
             "wins": p.wins,
-            "losses": losses,
-            "nrr": round(nrr, 3)  # more precision
+            "losses": p.losses,
+            "points": p.points,
+            "nrr": round(nrr, 3)
         })
 
-    # 🏆 Proper sorting (Points → NRR → Wins)
+    # ✅ Proper sorting
     result.sort(
         key=lambda x: (x["points"], x["nrr"], x["wins"]),
         reverse=True
     )
 
-    # 🥇 Add rank
+    # ✅ Rank
     for i, r in enumerate(result):
         r["rank"] = i + 1
 
@@ -360,6 +355,43 @@ def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     }
 
 
+# @router.get("/{tournament_id}/teams")
+# def get_teams(tournament_id: int, db: Session = Depends(get_db)):
+#     teams = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         status="approved"
+#     ).all()
+#
+#     result = []
+#
+#     for t in teams:
+#         team = db.query(Team).get(t.team_id)
+#
+#         # 🔥 find group mapping for THIS tournament only
+#         group_map = db.query(GroupTeam).join(
+#             TournamentGroup,
+#             GroupTeam.group_id == TournamentGroup.id
+#         ).filter(
+#             GroupTeam.team_id == t.team_id,
+#             TournamentGroup.tournament_id == tournament_id
+#         ).first()
+#
+#         group_name = None
+#
+#         if group_map:
+#             group = db.query(TournamentGroup).get(group_map.group_id)
+#             if group:
+#                 group_name = group.name
+#
+#         result.append({
+#             "team_id": t.team_id,
+#             "team_name": team.name if team else "Unknown",
+#             "group_name": group_name or "No Group"
+#         })
+#
+#     return result
+
+
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):
     teams = db.query(TournamentTeam).filter_by(
@@ -371,8 +403,9 @@ def get_teams(tournament_id: int, db: Session = Depends(get_db)):
 
     for t in teams:
         team = db.query(Team).get(t.team_id)
+        team_name = team.name if team else "Unknown"
 
-        # 🔥 find group mapping for THIS tournament only
+        # 🔍 GROUP MAPPING
         group_map = db.query(GroupTeam).join(
             TournamentGroup,
             GroupTeam.group_id == TournamentGroup.id
@@ -388,11 +421,33 @@ def get_teams(tournament_id: int, db: Session = Depends(get_db)):
             if group:
                 group_name = group.name
 
+        # 🔥💥 ENSURE POINTS ROW EXISTS
+        existing = db.query(TournamentPoints).filter_by(
+            tournament_id=tournament_id,
+            team_name=team_name
+        ).first()
+
+        if not existing:
+            db.add(TournamentPoints(
+                tournament_id=tournament_id,
+                team_name=team_name,
+                played=0,
+                wins=0,
+                losses=0,
+                points=0,
+                runs_scored=0,
+                runs_conceded=0,
+                overs_faced=0,
+                overs_bowled=0
+            ))
+
         result.append({
             "team_id": t.team_id,
-            "team_name": team.name if team else "Unknown",
+            "team_name": team_name,
             "group_name": group_name or "No Group"
         })
+
+    db.commit()  # 🔥 IMPORTANT
 
     return result
 

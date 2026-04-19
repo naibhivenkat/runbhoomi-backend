@@ -449,41 +449,83 @@ def add_ball(
     }
 
 
+def update_points(
+        db,
+        tournament_id,
+        team_name,
+        runs_scored,
+        overs_faced,
+        runs_conceded,
+        overs_bowled,
+        is_winner
+):
+    p = db.query(TournamentPoints).filter_by(
+        tournament_id=tournament_id,
+        team_name=team_name
+    ).first()
+
+    if not p:
+        return
+
+    p.played += 1
+    p.runs_scored += runs_scored
+    p.overs_faced += overs_faced
+    p.runs_conceded += runs_conceded
+    p.overs_bowled += overs_bowled
+
+    if is_winner:
+        p.wins += 1
+        p.points += 2
+    else:
+        p.losses += 1
+
+
 @router.post("/{match_id}/result")
 def update_result(
         match_id: int,
+        team_a_runs: int,
+        team_a_overs: float,
+        team_b_runs: int,
+        team_b_overs: float,
         winner: str,
-        runs_scored: int,
-        overs: float,
         db: Session = Depends(get_db)
 ):
     match = db.query(TournamentMatch).get(match_id)
+
+    if match.winner:
+        return {"message": "Result already submitted"}
+
     match.winner = winner
 
-    # update points
-    teams = [match.team_a, match.team_b]
+    team_a = match.team_a
+    team_b = match.team_b
 
-    for team in teams:
-        p = db.query(TournamentPoints).filter_by(
-            tournament_id=match.tournament_id,
-            team_name=team
-        ).first()
+    # 🔥 Use reusable function
+    update_points(
+        db,
+        match.tournament_id,
+        team_a,
+        team_a_runs,
+        team_a_overs,
+        team_b_runs,
+        team_b_overs,
+        is_winner=(winner == team_a)
+    )
 
-        p.played += 1
-
-        if team == winner:
-            p.wins += 1
-            p.points += 2
-            p.runs_scored += runs_scored
-            p.overs_faced += overs
-        else:
-            p.losses += 1
-            p.runs_conceded += runs_scored
-            p.overs_bowled += overs
+    update_points(
+        db,
+        match.tournament_id,
+        team_b,
+        team_b_runs,
+        team_b_overs,
+        team_a_runs,
+        team_a_overs,
+        is_winner=(winner == team_b)
+    )
 
     db.commit()
 
-    return {"message": "Result updated"}
+    return {"message": "Result updated successfully"}
 
 
 @router.post("/add_player_to_team")
