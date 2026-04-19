@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
 import uuid
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query
+from pydantic import BaseModel
+from sqlalchemy import cast, Time
+from sqlalchemy.orm import Session
+
 from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam, TeamInvite, \
     TeamPlayer, TournamentGroup
-from app.tournaments.group_service import create_groups, round_robin, generate_knockout, paired_rounds, \
+from app.tournaments.group_service import create_groups, generate_knockout, paired_rounds, \
     get_match_duration
-from datetime import datetime, timedelta
-
-from sqlalchemy import cast, Time
 
 router = APIRouter(prefix="/tournaments")
 
@@ -272,22 +273,47 @@ def get_points(tournament_id: int, db: Session = Depends(get_db)):
         tournament_id=tournament_id
     ).all()
 
+    def convert_overs(overs):
+        """
+        Convert cricket overs format (e.g., 19.3) → real overs (19.5)
+        """
+        if overs is None:
+            return 0
+
+        whole = int(overs)
+        balls = int(round((overs - whole) * 10))  # .3 → 3 balls
+        return whole + (balls / 6)
+
     result = []
 
     for p in points:
+        overs_faced = convert_overs(p.overs_faced)
+        overs_bowled = convert_overs(p.overs_bowled)
+
         nrr = 0
-        if p.overs_faced > 0 and p.overs_bowled > 0:
-            nrr = (p.runs_scored / p.overs_faced) - (p.runs_conceded / p.overs_bowled)
+        if overs_faced > 0 and overs_bowled > 0:
+            nrr = (p.runs_scored / overs_faced) - (p.runs_conceded / overs_bowled)
+
+        losses = p.played - p.wins
 
         result.append({
             "team": p.team_name,
             "points": p.points,
             "played": p.played,
             "wins": p.wins,
-            "nrr": round(nrr, 2)
+            "losses": losses,
+            "nrr": round(nrr, 3)  # more precision
         })
 
-    result.sort(key=lambda x: (x["points"], x["nrr"]), reverse=True)
+    # 🏆 Proper sorting (Points → NRR → Wins)
+    result.sort(
+        key=lambda x: (x["points"], x["nrr"], x["wins"]),
+        reverse=True
+    )
+
+    # 🥇 Add rank
+    for i, r in enumerate(result):
+        r["rank"] = i + 1
 
     return result
 

@@ -2,7 +2,6 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import or_, func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import models
