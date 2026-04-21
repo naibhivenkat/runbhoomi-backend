@@ -814,3 +814,20 @@ def get_groups(tournament_id: int, db: Session = Depends(get_db)):
         {"id": g.id, "name": g.name}
         for g in groups
     ]
+
+
+@router.get("/{tournament_id}/my-role")
+def get_my_role(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    record = db.query(TournamentUser).filter_by(
+        tournament_id=tournament_id,
+        user_id=user_id
+    ).first()
+
+    if not record:
+        return {"role": "PLAYER"}
+
+    return {"role": record.role}
