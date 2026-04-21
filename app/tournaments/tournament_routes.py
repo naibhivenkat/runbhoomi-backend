@@ -46,7 +46,6 @@ class TournamentCreate(BaseModel):
 
 
 @router.post("/create")
-
 def create_tournament(
     data: dict,
     db: Session = Depends(get_db),
@@ -57,6 +56,26 @@ def create_tournament(
         name=data.get("name"),
         city=data.get("city"),
         ground=data.get("ground"),
+
+        organizer_name=data.get("organizer_name"),
+        organizer_phone=data.get("organizer_phone"),
+        organizer_email=data.get("organizer_email"),
+
+        start_date=data.get("start_date"),
+        end_date=data.get("end_date"),
+
+        category=data.get("category"),
+        ball_type=data.get("ball_type"),
+        pitch_type=data.get("pitch_type"),
+        match_type=data.get("match_type"),
+
+        total_teams=data.get("total_teams"),
+        format=data.get("format"),
+        overs=data.get("overs"),
+
+        logo_url=data.get("logo_url"),
+        banner_url=data.get("banner_url"),
+
         created_by=user_id
     )
 
@@ -64,13 +83,12 @@ def create_tournament(
     db.commit()
     db.refresh(tournament)
 
-    # 🔥 MAKE CREATOR ADMIN
+    # ADMIN ENTRY
     admin_entry = TournamentUser(
         tournament_id=tournament.id,
         user_id=user_id,
         role="ADMIN"
     )
-
     db.add(admin_entry)
     db.commit()
 
