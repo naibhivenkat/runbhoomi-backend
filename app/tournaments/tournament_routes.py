@@ -633,14 +633,62 @@ def create_team(name: str, captain_id: int, db: Session = Depends(get_db)):
     }
 
 
+# @router.post("/{tournament_id}/join")
+# def join_tournament(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
+#     existing = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         team_id=team_id
+#     ).first()
+#
+#     if existing:
+#         raise HTTPException(400, "Already joined")
+#
+#     entry = TournamentTeam(
+#         tournament_id=tournament_id,
+#         team_id=team_id,
+#         status="pending"
+#     )
+#
+#     db.add(entry)
+#     db.commit()
+#
+#     return {"message": "Request sent"}
+
 @router.post("/{tournament_id}/join")
-def join_tournament(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
+def join_tournament(
+    tournament_id: int,
+    team_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    # 🔥 BLOCK ADMIN
+    admin = db.query(TournamentUser).filter_by(
+        tournament_id=tournament_id,
+        user_id=user_id,
+        role="ADMIN"
+    ).first()
+
+    if admin:
+        raise HTTPException(403, "Admin cannot join own tournament")
+
+    # 🔥 CHECK TEAM OWNERSHIP (IMPORTANT)
+    team = db.query(Team).filter_by(id=team_id).first()
+
+    if not team:
+        raise HTTPException(404, "Team not found")
+
+    if team.captain_id != user_id:
+        raise HTTPException(403, "You can only join with your team")
+
+    # 🔥 CHECK EXISTING
     existing = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team_id
     ).first()
 
     if existing:
+        if existing.status == "rejected":
+            raise HTTPException(400, "Request was rejected")
         raise HTTPException(400, "Already joined")
 
     entry = TournamentTeam(
@@ -656,7 +704,14 @@ def join_tournament(tournament_id: int, team_id: int, db: Session = Depends(get_
 
 
 @router.post("/{tournament_id}/approve/{team_id}")
-def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
+def approve_team(
+    tournament_id: int,
+    team_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    require_admin(db, user_id, tournament_id)
+
     entry = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team_id
@@ -665,15 +720,54 @@ def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)
     if not entry:
         raise HTTPException(404, "Not found")
 
-    entry.status = "approved"
+    if entry.status == "approved":
+        raise HTTPException(400, "Already approved")
 
+    entry.status = "approved"
     db.commit()
 
     return {"message": "Approved"}
 
+# @router.post("/{tournament_id}/approve/{team_id}")
+# def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
+#     entry = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         team_id=team_id
+#     ).first()
+#
+#     if not entry:
+#         raise HTTPException(404, "Not found")
+#
+#     entry.status = "approved"
+#
+#     db.commit()
+#
+#     return {"message": "Approved"}
+
+
+# @router.get("/{tournament_id}/requests")
+# def get_requests(tournament_id: int, db: Session = Depends(get_db)):
+#     teams = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         status="pending"
+#     ).all()
+#
+#     return [
+#         {
+#             "team_id": t.team.id,
+#             "team_name": t.team.name
+#         }
+#         for t in teams
+#     ]
 
 @router.get("/{tournament_id}/requests")
-def get_requests(tournament_id: int, db: Session = Depends(get_db)):
+def get_requests(
+    tournament_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    require_admin(db, user_id, tournament_id)
+
     teams = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         status="pending"
@@ -687,12 +781,34 @@ def get_requests(tournament_id: int, db: Session = Depends(get_db)):
         for t in teams
     ]
 
+# @router.post("/{tournament_id}/reject/{team_id}")
+# def reject_team(
+#         tournament_id: int,
+#         team_id: int,
+#         db: Session = Depends(get_db)):
+#     entry = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         team_id=team_id
+#     ).first()
+#
+#     if not entry:
+#         raise HTTPException(404, "Not found")
+#
+#     entry.status = "rejected"
+#     db.commit()
+#
+#     return {"message": "Rejected"}
+
 
 @router.post("/{tournament_id}/reject/{team_id}")
 def reject_team(
-        tournament_id: int,
-        team_id: int,
-        db: Session = Depends(get_db)):
+    tournament_id: int,
+    team_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    require_admin(db, user_id, tournament_id)
+
     entry = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
         team_id=team_id
@@ -700,6 +816,9 @@ def reject_team(
 
     if not entry:
         raise HTTPException(404, "Not found")
+
+    if entry.status == "rejected":
+        raise HTTPException(400, "Already rejected")
 
     entry.status = "rejected"
     db.commit()
