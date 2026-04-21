@@ -914,3 +914,19 @@ def get_my_cricket(
         },
         "matches": []
     }
+
+@router.get("/tournament/{tournament_id}")
+def get_matches_by_tournament(tournament_id: int, db: Session = Depends(get_db)):
+    matches = db.query(TournamentMatch).filter_by(
+        tournament_id=tournament_id
+    ).all()
+
+    return [
+        {
+            "team_a": m.team_a,
+            "team_b": m.team_b,
+            "result": m.result,
+            "date": m.date
+        }
+        for m in matches
+    ]
