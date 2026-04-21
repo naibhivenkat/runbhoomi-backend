@@ -415,48 +415,116 @@ def generate_fixtures(
 
     return {"message": "Fixtures created with schedule"}
 
+# @router.get("/{tournament_id}/points")
+# def get_points(tournament_id: int, db: Session = Depends(get_db)):
+#     points = db.query(TournamentPoints).filter_by(
+#         tournament_id=tournament_id
+#     ).all()
+#
+#     def convert_overs(overs):
+#         if overs is None:
+#             return 0
+#
+#         whole = int(overs)
+#         balls = int(round((overs - whole) * 10))
+#         return whole + (balls / 6)
+#
+#     result = []
+#
+#     for p in points:
+#         overs_faced = convert_overs(p.overs_faced)
+#         overs_bowled = convert_overs(p.overs_bowled)
+#
+#         nrr = 0
+#         if overs_faced > 0 and overs_bowled > 0:
+#             nrr = (p.runs_scored / overs_faced) - (p.runs_conceded / overs_bowled)
+#
+#         result.append({
+#             "team": p.team_name,
+#             "played": p.played,
+#             "wins": p.wins,
+#             "losses": p.losses,
+#             "points": p.points,
+#             "nrr": round(nrr, 3)
+#         })
+#
+#     # ✅ Proper sorting
+#     result.sort(
+#         key=lambda x: (x["points"], x["nrr"], x["wins"]),
+#         reverse=True
+#     )
+#
+#     # ✅ Rank
+#     for i, r in enumerate(result):
+#         r["rank"] = i + 1
+#
+#     return result
+#
+
+
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: int, db: Session = Depends(get_db)):
-    points = db.query(TournamentPoints).filter_by(
-        tournament_id=tournament_id
+
+    # ✅ Get all teams in tournament
+    teams = db.query(TournamentTeam).filter_by(
+        tournament_id=tournament_id,
+        status="approved"
     ).all()
-
-    def convert_overs(overs):
-        if overs is None:
-            return 0
-
-        whole = int(overs)
-        balls = int(round((overs - whole) * 10))
-        return whole + (balls / 6)
 
     result = []
 
-    for p in points:
-        overs_faced = convert_overs(p.overs_faced)
-        overs_bowled = convert_overs(p.overs_bowled)
+    for t in teams:
+        team_name = t.team.name
 
-        nrr = 0
-        if overs_faced > 0 and overs_bowled > 0:
-            nrr = (p.runs_scored / overs_faced) - (p.runs_conceded / overs_bowled)
+        # ✅ Try to get points row
+        p = db.query(TournamentPoints).filter_by(
+            tournament_id=tournament_id,
+            team_name=team_name
+        ).first()
+
+        if p:
+            played = p.played
+            wins = p.wins
+            losses = p.losses
+            points = p.points
+
+            # NRR calc
+            def convert_overs(overs):
+                if overs is None:
+                    return 0
+                whole = int(overs)
+                balls = int(round((overs - whole) * 10))
+                return whole + (balls / 6)
+
+            overs_faced = convert_overs(p.overs_faced)
+            overs_bowled = convert_overs(p.overs_bowled)
+
+            nrr = 0
+            if overs_faced > 0 and overs_bowled > 0:
+                nrr = (p.runs_scored / overs_faced) - (p.runs_conceded / overs_bowled)
+
+        else:
+            # ✅ DEFAULT VALUES (THIS WAS MISSING 🔥)
+            played = 0
+            wins = 0
+            losses = 0
+            points = 0
+            nrr = 0
 
         result.append({
-            "team": p.team_name,
-            "played": p.played,
-            "wins": p.wins,
-            "losses": p.losses,
-            "points": p.points,
+            "team": team_name,
+            "played": played,
+            "wins": wins,
+            "losses": losses,
+            "points": points,
             "nrr": round(nrr, 3)
         })
 
-    # ✅ Proper sorting
+    # ✅ Sort
     result.sort(
         key=lambda x: (x["points"], x["nrr"], x["wins"]),
         reverse=True
     )
-
-    # ✅ Rank
-    for i, r in enumerate(result):
-        r["rank"] = i + 1
 
     return result
 

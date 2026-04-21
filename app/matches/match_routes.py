@@ -888,3 +888,29 @@ def quick_add_player(data: QuickAddPlayerRequest, db: Session = Depends(get_db))
     db.refresh(player)
 
     return {"id": player.id, "name": player.name}
+
+
+@router.get("/my-cricket")
+def get_my_cricket(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    # ✅ get user using ID from token
+    user = db.query(User).filter_by(id=user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # 🔥 TEMP (replace with real stats later)
+    return {
+        "profile": {
+            "name": user.name,
+            "role": "All-rounder",
+            "matches": 0,
+            "runs": 0,
+            "wickets": 0,
+            "avg": 0,
+            "strike": 0
+        },
+        "matches": []
+    }
