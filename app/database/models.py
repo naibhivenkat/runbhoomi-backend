@@ -213,6 +213,7 @@ class Tournament(Base):
     id = Column(Integer, primary_key=True)
 
     name = Column(String, nullable=False)
+    created_by = Column(Integer, ForeignKey("players.id"))
     city = Column(String)
     ground = Column(String)
 
@@ -327,3 +328,18 @@ class TeamInvite(Base):
     team_id = Column(Integer, ForeignKey("teams.id"))
     code = Column(String, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+
+class TournamentUser(Base):
+    __tablename__ = "tournament_users"
+
+    id = Column(Integer, primary_key=True)
+
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"))
+    user_id = Column(Integer, ForeignKey("players.id"))
+
+    role = Column(String, default="PLAYER")  # ADMIN / PLAYER
+
+    tournament = relationship("Tournament")
+    user = relationship("Player")
