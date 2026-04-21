@@ -925,8 +925,18 @@ def get_matches_by_tournament(tournament_id: int, db: Session = Depends(get_db))
         {
             "team_a": m.team_a,
             "team_b": m.team_b,
-            "result": m.result,
-            "date": m.date
+
+            "team_a_id": m.team_a_id,
+            "team_b_id": m.team_b_id,
+
+            "group": m.group_id,
+
+            "date": m.match_date,
+
+            "result": (
+                f"{m.winner} won"
+                if m.winner else None
+            )
         }
         for m in matches
     ]
