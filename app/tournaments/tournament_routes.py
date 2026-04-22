@@ -47,11 +47,10 @@ class TournamentCreate(BaseModel):
 
 @router.post("/create")
 def create_tournament(
-    data: dict,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        data: dict,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
-
     tournament = models.Tournament(
         name=data.get("name"),
         city=data.get("city"),
@@ -318,7 +317,7 @@ def generate_fixtures(
         start_time: str = Query("08:00"),
         gap: int = Query(10),
         db: Session = Depends(get_db),
-        user_id: int = Depends(get_current_user_id)   # 🔥 ADD
+        user_id: int = Depends(get_current_user_id)  # 🔥 ADD
 ):
     # 🔐 ADMIN CHECK (MOST IMPORTANT)
     require_admin(db, user_id, tournament_id)
@@ -415,6 +414,7 @@ def generate_fixtures(
 
     return {"message": "Fixtures created with schedule"}
 
+
 # @router.get("/{tournament_id}/points")
 # def get_points(tournament_id: int, db: Session = Depends(get_db)):
 #     points = db.query(TournamentPoints).filter_by(
@@ -464,7 +464,6 @@ def generate_fixtures(
 
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: int, db: Session = Depends(get_db)):
-
     # ✅ Get all teams in tournament
     teams = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
@@ -724,10 +723,10 @@ def create_team(name: str, captain_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{tournament_id}/join")
 def join_tournament(
-    tournament_id: int,
-    team_id: int,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        tournament_id: int,
+        team_id: int,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     # 🔥 BLOCK ADMIN
     admin = db.query(TournamentUser).filter_by(
@@ -748,6 +747,15 @@ def join_tournament(
     if team.captain_id != user_id:
         raise HTTPException(403, "You can only join with your team")
 
+    # ✅ TEAM FULL CHECK (ADDED)
+    # ⚠️ Replace TeamPlayer with your actual table if different
+    players_count = db.query(TeamPlayer).filter_by(team_id=team_id).count()
+
+    max_players = team.max_players if hasattr(team, "max_players") else 11
+
+    if players_count >= max_players:
+        raise HTTPException(400, "Team is already full")
+
     # 🔥 CHECK EXISTING
     existing = db.query(TournamentTeam).filter_by(
         tournament_id=tournament_id,
@@ -759,6 +767,7 @@ def join_tournament(
             raise HTTPException(400, "Request was rejected")
         raise HTTPException(400, "Already joined")
 
+    # 🔥 CREATE ENTRY
     entry = TournamentTeam(
         tournament_id=tournament_id,
         team_id=team_id,
@@ -768,15 +777,18 @@ def join_tournament(
     db.add(entry)
     db.commit()
 
-    return {"message": "Request sent"}
+    return {
+        "success": True,
+        "message": "Request sent"
+    }
 
 
 @router.post("/{tournament_id}/approve/{team_id}")
 def approve_team(
-    tournament_id: int,
-    team_id: int,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        tournament_id: int,
+        team_id: int,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     require_admin(db, user_id, tournament_id)
 
@@ -795,6 +807,7 @@ def approve_team(
     db.commit()
 
     return {"message": "Approved"}
+
 
 # @router.post("/{tournament_id}/approve/{team_id}")
 # def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
@@ -830,9 +843,9 @@ def approve_team(
 
 @router.get("/{tournament_id}/requests")
 def get_requests(
-    tournament_id: int,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        tournament_id: int,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     require_admin(db, user_id, tournament_id)
 
@@ -848,6 +861,7 @@ def get_requests(
         }
         for t in teams
     ]
+
 
 # @router.post("/{tournament_id}/reject/{team_id}")
 # def reject_team(
@@ -870,10 +884,10 @@ def get_requests(
 
 @router.post("/{tournament_id}/reject/{team_id}")
 def reject_team(
-    tournament_id: int,
-    team_id: int,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        tournament_id: int,
+        team_id: int,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     require_admin(db, user_id, tournament_id)
 
@@ -1005,9 +1019,9 @@ def get_groups(tournament_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{tournament_id}/my-role")
 def get_my_role(
-    tournament_id: int,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        tournament_id: int,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     record = db.query(TournamentUser).filter_by(
         tournament_id=tournament_id,
