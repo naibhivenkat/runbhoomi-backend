@@ -1,5 +1,6 @@
 from app.database.models import TournamentGroup, GroupTeam
 
+
 def create_groups(db, tournament_id, teams, group_count):
     n = len(teams)
 
@@ -12,7 +13,7 @@ def create_groups(db, tournament_id, teams, group_count):
     for i in range(group_count):
         g = TournamentGroup(
             tournament_id=tournament_id,
-            name=f"Group {chr(65+i)}"
+            name=f"Group {chr(65 + i)}"
         )
         db.add(g)
         db.commit()
@@ -41,6 +42,8 @@ def create_groups(db, tournament_id, teams, group_count):
 
     db.commit()
     return groups
+
+
 def round_robin(team_ids):
     fixtures = []
 
@@ -52,6 +55,7 @@ def round_robin(team_ids):
 
 
 import math
+
 
 def generate_knockout(team_ids):
     n = len(team_ids)
@@ -66,16 +70,17 @@ def generate_knockout(team_ids):
     fixtures = []
 
     for i in range(0, len(teams), 2):
-        fixtures.append((teams[i], teams[i+1]))
+        fixtures.append((teams[i], teams[i + 1]))
 
     return fixtures
+
 
 def calculate_nrr(p):
     if p.overs_faced == 0 or p.overs_bowled == 0:
         return 0
 
     return (p.runs_scored / p.overs_faced) - (
-        p.runs_conceded / p.overs_bowled
+            p.runs_conceded / p.overs_bowled
     )
 
 
@@ -85,7 +90,7 @@ def paired_rounds(team_ids):
     # Round 1: (1 vs 2), (3 vs 4)
     for i in range(0, len(team_ids), 2):
         if i + 1 < len(team_ids):
-            matches.append((team_ids[i], team_ids[i+1]))
+            matches.append((team_ids[i], team_ids[i + 1]))
 
     # Round 2: cross matches
     if len(team_ids) >= 4:

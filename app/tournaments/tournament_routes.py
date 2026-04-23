@@ -197,119 +197,6 @@ def get_tournaments(db: Session = Depends(get_db)):
     ]
 
 
-# @router.post("/{tournament_id}/generate_fixtures")
-# def generate_fixtures(
-#         tournament_id: int,
-#         group_count: int = Query(2),
-#         start_time: str = Query("08:00"),
-#         gap: int = Query(10),
-#         db: Session = Depends(get_db)
-# ):
-#     tournament = db.query(models.Tournament).get(tournament_id)
-#
-#     if not tournament:
-#         raise HTTPException(404, "Tournament not found")
-#
-#     teams = db.query(TournamentTeam).filter_by(
-#         tournament_id=tournament_id,
-#         status="approved"
-#     ).all()
-#
-#     if len(teams) < 2:
-#         raise HTTPException(400, "Not enough teams")
-#
-#     # DELETE OLD
-#     db.query(TournamentMatch).filter(
-#         TournamentMatch.tournament_id == tournament_id
-#     ).delete(synchronize_session=False)
-#
-#     old_groups = db.query(TournamentGroup).filter(
-#         TournamentGroup.tournament_id == tournament_id
-#     ).all()
-#
-#     group_ids = [g.id for g in old_groups]
-#
-#     if group_ids:
-#         db.query(GroupTeam).filter(
-#             GroupTeam.group_id.in_(group_ids)
-#         ).delete(synchronize_session=False)
-#
-#     db.query(TournamentGroup).filter(
-#         TournamentGroup.tournament_id == tournament_id
-#     ).delete(synchronize_session=False)
-#
-#     db.commit()
-#
-#     ids = [t.team_id for t in teams]
-#
-#     matches_created = []
-#
-#     if tournament.format in ["league", "hybrid"]:
-#
-#         groups = create_groups(db, tournament_id, teams, group_count)
-#
-#         for g in groups:
-#             group_teams = db.query(GroupTeam).filter_by(group_id=g.id).all()
-#             team_ids = [gt.team_id for gt in group_teams]
-#
-#             fixtures = paired_rounds(team_ids)
-#
-#             for a, b in fixtures:
-#                 m = TournamentMatch(
-#                     tournament_id=tournament_id,
-#                     team_a_id=a,
-#                     team_b_id=b,
-#                     team_a=db.query(Team).get(a).name,
-#                     team_b=db.query(Team).get(b).name,
-#                     match_type="league",
-#                     group_id=g.id,
-#                     round=1
-#                 )
-#                 db.add(m)
-#                 matches_created.append(m)
-#
-#     db.commit()
-#
-#     # 🔥 FETCH FROM DB (IMPORTANT FIX)
-#     # matches = db.query(TournamentMatch).filter_by(
-#     #     tournament_id=tournament_id
-#     # ).all()
-#     matches = db.query(TournamentMatch).filter_by(
-#         tournament_id=tournament_id
-#     ).order_by(cast(TournamentMatch.match_time, Time)).all()
-#
-#     print("MATCHES COUNT:", len(matches))  # debug
-#
-#     # 🔥 REALISTIC DURATION
-#     duration = get_match_duration(tournament.overs)
-#
-#     current_time = datetime.strptime(start_time, "%H:%M")
-#
-#     # 🔥 GROUPING
-#     grouped = {}
-#     for m in matches:
-#         grouped.setdefault(m.group_id, []).append(m)
-#
-#     # 🔥 INTERLEAVE ORDER
-#     order = []
-#     max_len = max(len(v) for v in grouped.values())
-#
-#     for i in range(max_len):
-#         for g in grouped:
-#             if i < len(grouped[g]):
-#                 order.append(grouped[g][i])
-#
-#     # 🔥 ASSIGN TIME
-#     for m in order:
-#         m.match_time = current_time.strftime("%H:%M")
-#         print(f"Assigning {m.team_a} vs {m.team_b} → {m.match_time}")  # debug
-#         current_time += timedelta(minutes=duration + gap)
-#
-#     db.commit()
-#
-#     return {"message": "Fixtures created with schedule"}
-
-
 @router.post("/{tournament_id}/generate_fixtures")
 def generate_fixtures(
         tournament_id: int,
@@ -413,53 +300,6 @@ def generate_fixtures(
     db.commit()
 
     return {"message": "Fixtures created with schedule"}
-
-
-# @router.get("/{tournament_id}/points")
-# def get_points(tournament_id: int, db: Session = Depends(get_db)):
-#     points = db.query(TournamentPoints).filter_by(
-#         tournament_id=tournament_id
-#     ).all()
-#
-#     def convert_overs(overs):
-#         if overs is None:
-#             return 0
-#
-#         whole = int(overs)
-#         balls = int(round((overs - whole) * 10))
-#         return whole + (balls / 6)
-#
-#     result = []
-#
-#     for p in points:
-#         overs_faced = convert_overs(p.overs_faced)
-#         overs_bowled = convert_overs(p.overs_bowled)
-#
-#         nrr = 0
-#         if overs_faced > 0 and overs_bowled > 0:
-#             nrr = (p.runs_scored / overs_faced) - (p.runs_conceded / overs_bowled)
-#
-#         result.append({
-#             "team": p.team_name,
-#             "played": p.played,
-#             "wins": p.wins,
-#             "losses": p.losses,
-#             "points": p.points,
-#             "nrr": round(nrr, 3)
-#         })
-#
-#     # ✅ Proper sorting
-#     result.sort(
-#         key=lambda x: (x["points"], x["nrr"], x["wins"]),
-#         reverse=True
-#     )
-#
-#     # ✅ Rank
-#     for i, r in enumerate(result):
-#         r["rank"] = i + 1
-#
-#     return result
-#
 
 
 @router.get("/{tournament_id}/points")
@@ -570,43 +410,6 @@ def delete_upcoming_fixtures(tournament_id: int, db: Session = Depends(get_db)):
     }
 
 
-# @router.get("/{tournament_id}/teams")
-# def get_teams(tournament_id: int, db: Session = Depends(get_db)):
-#     teams = db.query(TournamentTeam).filter_by(
-#         tournament_id=tournament_id,
-#         status="approved"
-#     ).all()
-#
-#     result = []
-#
-#     for t in teams:
-#         team = db.query(Team).get(t.team_id)
-#
-#         # 🔥 find group mapping for THIS tournament only
-#         group_map = db.query(GroupTeam).join(
-#             TournamentGroup,
-#             GroupTeam.group_id == TournamentGroup.id
-#         ).filter(
-#             GroupTeam.team_id == t.team_id,
-#             TournamentGroup.tournament_id == tournament_id
-#         ).first()
-#
-#         group_name = None
-#
-#         if group_map:
-#             group = db.query(TournamentGroup).get(group_map.group_id)
-#             if group:
-#                 group_name = group.name
-#
-#         result.append({
-#             "team_id": t.team_id,
-#             "team_name": team.name if team else "Unknown",
-#             "group_name": group_name or "No Group"
-#         })
-#
-#     return result
-
-
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: int, db: Session = Depends(get_db)):
     teams = db.query(TournamentTeam).filter_by(
@@ -700,27 +503,6 @@ def create_team(name: str, captain_id: int, db: Session = Depends(get_db)):
     }
 
 
-# @router.post("/{tournament_id}/join")
-# def join_tournament(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
-#     existing = db.query(TournamentTeam).filter_by(
-#         tournament_id=tournament_id,
-#         team_id=team_id
-#     ).first()
-#
-#     if existing:
-#         raise HTTPException(400, "Already joined")
-#
-#     entry = TournamentTeam(
-#         tournament_id=tournament_id,
-#         team_id=team_id,
-#         status="pending"
-#     )
-#
-#     db.add(entry)
-#     db.commit()
-#
-#     return {"message": "Request sent"}
-
 @router.post("/{tournament_id}/join")
 def join_tournament(
         tournament_id: int,
@@ -809,38 +591,6 @@ def approve_team(
     return {"message": "Approved"}
 
 
-# @router.post("/{tournament_id}/approve/{team_id}")
-# def approve_team(tournament_id: int, team_id: int, db: Session = Depends(get_db)):
-#     entry = db.query(TournamentTeam).filter_by(
-#         tournament_id=tournament_id,
-#         team_id=team_id
-#     ).first()
-#
-#     if not entry:
-#         raise HTTPException(404, "Not found")
-#
-#     entry.status = "approved"
-#
-#     db.commit()
-#
-#     return {"message": "Approved"}
-
-
-# @router.get("/{tournament_id}/requests")
-# def get_requests(tournament_id: int, db: Session = Depends(get_db)):
-#     teams = db.query(TournamentTeam).filter_by(
-#         tournament_id=tournament_id,
-#         status="pending"
-#     ).all()
-#
-#     return [
-#         {
-#             "team_id": t.team.id,
-#             "team_name": t.team.name
-#         }
-#         for t in teams
-#     ]
-
 @router.get("/{tournament_id}/requests")
 def get_requests(
         tournament_id: int,
@@ -861,25 +611,6 @@ def get_requests(
         }
         for t in teams
     ]
-
-
-# @router.post("/{tournament_id}/reject/{team_id}")
-# def reject_team(
-#         tournament_id: int,
-#         team_id: int,
-#         db: Session = Depends(get_db)):
-#     entry = db.query(TournamentTeam).filter_by(
-#         tournament_id=tournament_id,
-#         team_id=team_id
-#     ).first()
-#
-#     if not entry:
-#         raise HTTPException(404, "Not found")
-#
-#     entry.status = "rejected"
-#     db.commit()
-#
-#     return {"message": "Rejected"}
 
 
 @router.post("/{tournament_id}/reject/{team_id}")

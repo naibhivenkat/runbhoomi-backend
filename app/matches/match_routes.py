@@ -10,7 +10,6 @@ from app.database.models import TournamentPoints, TournamentMatch
 from app.auth.deps import get_current_user_id
 from app.utls.permissions import require_admin
 
-
 router = APIRouter(prefix="/matches")
 
 
@@ -27,29 +26,16 @@ class QuickAddPlayerRequest(BaseModel):
 # =========================
 # CREATE MATCH
 # =========================
-# @router.post("/create_match")
-# def create_match(team_a_id: int, team_b_id: int, overs: int = 20,
-#                  db: Session = Depends(get_db)):
-#     match = models.Match(
-#         team_a_id=team_a_id,
-#         team_b_id=team_b_id,
-#         total_overs=overs,
-#         status="created"
-#     )
-#     db.add(match)
-#     db.commit()
-#     db.refresh(match)
-#
-#     return {"match_id": match.id, "message": "Match created"}
+
 
 @router.post("/create_match")
 def create_match(
-    tournament_id: int,
-    team_a_id: int,
-    team_b_id: int,
-    overs: int = 20,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        tournament_id: int,
+        team_a_id: int,
+        team_b_id: int,
+        overs: int = 20,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     # 🔐 ADMIN CHECK
     require_admin(db, user_id, tournament_id)
@@ -74,62 +60,17 @@ def create_match(
 # =========================
 # START MATCH
 # =========================
-# @router.post("/{match_id}/start_match")
-# def start_match(match_id: int, striker_id: int,
-#                 non_striker_id: int, bowler_name: str,
-#                 db: Session = Depends(get_db)):
-#     match = db.query(models.Match).get(match_id)
-#
-#     if not match:
-#         raise HTTPException(404, "Match not found")
-#
-#     # clear previous
-#     db.query(models.Batsman).filter(
-#         models.Batsman.match_id == match_id
-#     ).delete()
-#
-#     striker_player = db.query(models.Player).get(striker_id)
-#     non_striker_player = db.query(models.Player).get(non_striker_id)
-#
-#     striker = models.Batsman(
-#         match_id=match_id,
-#         name=striker_player.name,
-#         is_striker=True
-#     )
-#
-#     non_striker = models.Batsman(
-#         match_id=match_id,
-#         name=non_striker_player.name,
-#         is_striker=False
-#     )
-#
-#     bowler = models.Bowler(
-#         match_id=match_id,
-#         name=bowler_name,
-#         overs="0.0",
-#         runs=0,
-#         wickets=0,
-#         economy=0
-#     )
-#
-#     db.add_all([striker, non_striker, bowler])
-#
-#     match.status = "live"
-#
-#     db.commit()
-#
-#     return {"message": "Match started"}
 
 
 @router.post("/{match_id}/start_match")
 def start_match(
-    match_id: int,
-    tournament_id: int,
-    striker_id: int,
-    non_striker_id: int,
-    bowler_name: str,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        match_id: int,
+        tournament_id: int,
+        striker_id: int,
+        non_striker_id: int,
+        bowler_name: str,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     # 🔐 ADMIN CHECK
     require_admin(db, user_id, tournament_id)
@@ -175,6 +116,7 @@ def start_match(
     db.commit()
 
     return {"message": "Match started"}
+
 
 @router.get("/get_matches")
 def get_matches(email: str, db: Session = Depends(get_db)):
@@ -386,165 +328,16 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
     }
 
 
-# @router.post("/{match_id}/add_ball")
-# def add_ball(
-#         match_id: int,
-#         runs: int = 0,
-#         wicket: bool = False,
-#         extra_type: str = None,
-#         extra_runs: int = 0,
-#         db: Session = Depends(get_db)
-# ):
-#     # =========================
-#     # OVER LOGIC
-#     # =========================
-#     last_ball = db.query(models.Ball).filter(
-#         models.Ball.match_id == match_id
-#     ).order_by(models.Ball.id.desc()).first()
-#
-#     over, ball_num = 0, 1
-#
-#     if last_ball:
-#         over = last_ball.over
-#         ball_num = last_ball.ball
-#
-#         if extra_type not in ["wide", "no_ball"]:
-#             ball_num += 1
-#             if ball_num > 6:
-#                 over += 1
-#                 ball_num = 1
-#
-#     # =========================
-#     # GET ACTIVE BATSMEN
-#     # =========================
-#     batsmen = db.query(models.Batsman).filter(
-#         models.Batsman.match_id == match_id,
-#         models.Batsman.is_out == False
-#     ).order_by(models.Batsman.id.asc()).all()
-#
-#     # reset if corrupted
-#     if len(batsmen) > 2:
-#         for b in batsmen[2:]:
-#             b.is_out = True
-#         batsmen = batsmen[:2]
-#
-#     # ensure 2 exist
-#     while len(batsmen) < 2:
-#         new = models.Batsman(
-#             match_id=match_id,
-#             name=f"Player {len(batsmen) + 1}",
-#             is_striker=(len(batsmen) == 0)
-#         )
-#         db.add(new)
-#         db.commit()
-#         batsmen.append(new)
-#
-#     # =========================
-#     # FIX STRIKER (IMPORTANT)
-#     # =========================
-#     strikers = [b for b in batsmen if b.is_striker]
-#
-#     if len(strikers) != 1:
-#         batsmen[0].is_striker = True
-#         for b in batsmen[1:]:
-#             b.is_striker = False
-#
-#     # ✅ DEFINE STRIKER / NON-STRIKER
-#     striker = next(b for b in batsmen if b.is_striker)
-#     non_striker = next(b for b in batsmen if not b.is_striker)
-#
-#     # =========================
-#     # CREATE BALL
-#     # =========================
-#     new_ball = models.Ball(
-#         match_id=match_id,
-#         over=over,
-#         ball=ball_num,
-#         runs=runs,
-#         extra_type=extra_type,
-#         extra_runs=extra_runs,
-#         is_wicket=wicket,
-#         created_at=datetime.utcnow()
-#     )
-#     db.add(new_ball)
-#
-#     # =========================
-#     # UPDATE BATSMAN
-#     # =========================
-#     if extra_type not in ["wide", "no_ball"]:
-#         striker.balls += 1
-#
-#     striker.runs += runs
-#
-#     if runs == 4:
-#         striker.fours += 1
-#     elif runs == 6:
-#         striker.sixes += 1
-#
-#     # =========================
-#     # WICKET
-#     # =========================
-#     if wicket:
-#         striker.is_out = True
-#         striker.is_striker = False
-#
-#         new_batsman = models.Batsman(
-#             match_id=match_id,
-#             name="Next Player",
-#             is_striker=True
-#         )
-#         db.add(new_batsman)
-#
-#     else:
-#         # STRIKE ROTATION
-#         if runs % 2 == 1:
-#             striker.is_striker = False
-#             non_striker.is_striker = True
-#
-#     # OVER END SWAP
-#     if ball_num == 6:
-#         striker.is_striker = not striker.is_striker
-#         non_striker.is_striker = not non_striker.is_striker
-#
-#     db.commit()
-#
-#     # =========================
-#     # SCORE RESPONSE
-#     # =========================
-#     balls = db.query(models.Ball).filter(
-#         models.Ball.match_id == match_id
-#     ).all()
-#
-#     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
-#     wickets = sum(1 for b in balls if b.is_wicket)
-#
-#     legal_balls = sum(
-#         1 for b in balls if b.extra_type not in ["wide", "no_ball"]
-#     )
-#
-#     overs = f"{legal_balls // 6}.{legal_balls % 6}"
-#
-#     return {
-#         "message": "Ball added",
-#         "data": {
-#             "score": f"{total_runs}/{wickets}",
-#             "overs": overs,
-#             "runs_last_ball": runs + extra_runs,
-#             "is_wicket": wicket
-#         }
-#     }
-
-
 @router.post("/{match_id}/add_ball")
 def add_ball(
-    match_id: int,
-    tournament_id: int,   # 🔥 REQUIRED
-    runs: int = 0,
-    wicket: bool = False,
-    extra_type: str = None,
-    extra_runs: int = 0,
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        match_id: int,
+        tournament_id: int,  # 🔥 REQUIRED
+        runs: int = 0,
+        wicket: bool = False,
+        extra_type: str = None,
+        extra_runs: int = 0,
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     # 🔐 BLOCK NON-ADMIN
     require_admin(db, user_id, tournament_id)
@@ -682,6 +475,7 @@ def add_ball(
             "is_wicket": wicket
         }
     }
+
 
 def update_points(
         db,
@@ -892,8 +686,8 @@ def quick_add_player(data: QuickAddPlayerRequest, db: Session = Depends(get_db))
 
 @router.get("/my-cricket")
 def get_my_cricket(
-    db: Session = Depends(get_db),
-    user_id: int = Depends(get_current_user_id)
+        db: Session = Depends(get_db),
+        user_id: int = Depends(get_current_user_id)
 ):
     # ✅ get user using ID from token
     user = db.query(User).filter_by(id=user_id).first()
@@ -914,6 +708,7 @@ def get_my_cricket(
         },
         "matches": []
     }
+
 
 @router.get("/tournament/{tournament_id}")
 def get_matches_by_tournament(tournament_id: int, db: Session = Depends(get_db)):
