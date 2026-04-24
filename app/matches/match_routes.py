@@ -831,8 +831,8 @@ def get_yet_to_bat(match_id: int, db: Session = Depends(get_db)):
     match = db.query(models.Match).get(match_id)
 
     # ✅ get batting team players
-    team_players = db.query(models.TeamPlayers).filter(
-        models.TeamPlayers.team_id == match.team1_id   # or batting_team_id
+    team_players = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == match.team1_id   # or batting_team_id
     ).all()
 
     # already batted
