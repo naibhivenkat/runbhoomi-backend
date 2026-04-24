@@ -201,7 +201,10 @@ def get_matches(email: str, db: Session = Depends(get_db)):
 
             "overs": overs_display,
             "status": m.status,
-            "note": note
+            "note": note,
+
+            "admin_id": m.admin_id,
+            "is_admin": m.admin_id == player.id if player else False
         })
 
     return result

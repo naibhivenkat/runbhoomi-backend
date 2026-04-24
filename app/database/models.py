@@ -33,9 +33,6 @@ class Player(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     name = Column(String(100), nullable=False)
-    # phone = Column(String(15), nullable=False)
-    # email = Column(String(120), unique=True, index=True, nullable=False)
-    # password_hash = Column(String, nullable=False)
     email = Column(String(120), unique=True, nullable=True)
     password_hash = Column(String, nullable=True)
     phone = Column(String(15), nullable=True)
@@ -124,6 +121,7 @@ class Match(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     playing_xi = relationship("PlayingXI", back_populates="match")
+    admin_id = Column(Integer, ForeignKey("players.id"))
 
 
 # =========================
