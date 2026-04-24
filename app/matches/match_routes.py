@@ -830,25 +830,35 @@ def get_yet_to_bat(match_id: int, db: Session = Depends(get_db)):
 
     match = db.query(models.Match).get(match_id)
 
-    # ✅ get batting team players
-    team_players = db.query(models.TeamPlayer).filter(
-        models.TeamPlayer.team_id == match.team1_id   # or batting_team_id
+    if not match:
+        raise HTTPException(404, "Match not found")
+
+    # ✅ get batting team players using JOIN (FIXED)
+    team_players = db.query(
+        models.Player.id,
+        models.Player.name
+    ).join(
+        models.TeamPlayer,
+        models.TeamPlayer.player_id == models.Player.id
+    ).filter(
+        models.TeamPlayer.team_id == match.team_a_id
     ).all()
 
-    # already batted
-    batted = db.query(models.Batsman).filter(
+    # ✅ already batted
+    batted = db.query(models.Batsman.player_id).filter(
         models.Batsman.match_id == match_id
     ).all()
 
-    batted_ids = [b.player_id for b in batted]
+    batted_ids = [b[0] for b in batted]
 
+    # ✅ filter remaining players
     result = [
         {
-            "id": tp.player.id,
-            "name": tp.player.name
+            "id": p.id,
+            "name": p.name
         }
-        for tp in team_players
-        if tp.player_id not in batted_ids
+        for p in team_players
+        if p.id not in batted_ids
     ]
 
     return {"players": result}
