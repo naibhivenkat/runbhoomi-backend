@@ -332,22 +332,23 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
 @router.post("/{match_id}/add_ball")
 def add_ball(
     match_id: int,
-    tournament_id: int,
     runs: int = 0,
     wicket: bool = False,
     extra_type: str = None,
     extra_runs: int = 0,
-    next_batsman_id: int = None,  # 🔥 IMPORTANT
+    next_batsman_id: int = None,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
     # 🔐 ADMIN CHECK
-    require_admin(db, user_id, tournament_id)
 
     match = db.query(models.Match).get(match_id)
 
     if not match:
         raise HTTPException(404, "Match not found")
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
 
     # =========================
     # GET LAST BALL
