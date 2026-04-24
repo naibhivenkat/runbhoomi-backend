@@ -709,17 +709,25 @@ def select_next_batsman(
 ):
     match = db.query(models.Match).get(match_id)
 
+    if not match:
+        raise HTTPException(404, "Match not found")
+
     if match.admin_id != user_id:
         raise HTTPException(403, "Not allowed")
 
-    # ✅ check player in playing XI
-    xi = db.query(models.PlayingXI).filter(
-        models.PlayingXI.match_id == match_id
+    # ✅ FIX: use correct batting team
+    batting_team_id = (
+        match.team_a_id if match.current_innings == 1 else match.team_b_id
+    )
+
+    # ✅ FIX: validate using team_players (NOT playing_xi)
+    team_players = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == batting_team_id
     ).all()
 
-    xi_ids = [p.player_id for p in xi]
+    team_player_ids = [tp.player_id for tp in team_players]
 
-    if player_id not in xi_ids:
+    if player_id not in team_player_ids:
         raise HTTPException(400, "Invalid player")
 
     # ❌ prevent duplicate batting
