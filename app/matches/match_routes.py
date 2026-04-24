@@ -1,13 +1,12 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
+from app.auth.deps import get_current_user_id
 from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentPoints, TournamentMatch
-from app.auth.deps import get_current_user_id
+from app.utls.match_model import BallInput
 from app.utls.permissions import require_admin
 
 router = APIRouter(prefix="/matches")
@@ -227,7 +226,7 @@ def get_match_detail(match_id: int, db: Session = Depends(get_db)):
 def get_live_score(match_id: int, db: Session = Depends(get_db)):
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
-    ).all()
+    ).order_by(models.Ball.id.asc()).all()
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
     wickets = sum(1 for b in balls if b.is_wicket)
@@ -237,34 +236,51 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
     overs = f"{legal_balls // 6}.{legal_balls % 6}"
     score = f"{total_runs}/{wickets}"
 
+    # =========================
+    # LAST OVER (FIXED 🔥)
+    # =========================
+    last_over = []
+    for b in balls[-6:]:
+        if b.is_wicket:
+            last_over.append("W")
+        elif b.extra_type == "wide":
+            last_over.append("WD")
+        elif b.extra_type == "no_ball":
+            last_over.append("NB")
+        else:
+            last_over.append(str(b.runs or 0))
+
+    # =========================
+    # BATSMEN
+    # =========================
     batsmen = db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id,
         models.Batsman.is_out == False
     ).all()
 
-    batsmen_data = [
-        {
+    batsmen_data = []
+    for b in batsmen:
+        batsmen_data.append({
             "name": b.name,
             "runs": b.runs,
             "balls": b.balls,
             "is_striker": b.is_striker
-        }
-        for b in batsmen
-    ]
+        })
+
+    # =========================
+    # EXTRAS
+    # =========================
+    total_extras = sum(b.extra_runs for b in balls)
 
     return {
         "score": score,
         "overs": overs,
-        "batsmen": batsmen_data
+        "batsmen": batsmen_data,
+        "last_over": last_over,
+        "extras": total_extras
     }
 
 
-class BallInput(BaseModel):
-    runs: int = 0
-    wicket: bool = False
-    extra_type: str | None = None
-    extra_runs: int = 0
-    next_batsman_id: int | None = None
 
 @router.post("/{match_id}/add_ball")
 def add_ball(
@@ -811,10 +827,15 @@ def next_innings(
 
 @router.get("/{match_id}/yet_to_bat")
 def get_yet_to_bat(match_id: int, db: Session = Depends(get_db)):
-    xi = db.query(models.PlayingXI).filter(
-        models.PlayingXI.match_id == match_id
+
+    match = db.query(models.Match).get(match_id)
+
+    # ✅ get batting team players
+    team_players = db.query(models.TeamPlayers).filter(
+        models.TeamPlayers.team_id == match.team1_id   # or batting_team_id
     ).all()
 
+    # already batted
     batted = db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id
     ).all()
@@ -823,10 +844,11 @@ def get_yet_to_bat(match_id: int, db: Session = Depends(get_db)):
 
     result = [
         {
-            "id": p.player.id,
-            "name": p.player.name
+            "id": tp.player.id,
+            "name": tp.player.name
         }
-        for p in xi if p.player_id not in batted_ids
+        for tp in team_players
+        if tp.player_id not in batted_ids
     ]
 
     return {"players": result}
