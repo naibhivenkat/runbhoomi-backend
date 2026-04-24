@@ -237,18 +237,103 @@ def get_match_detail(match_id: int, db: Session = Depends(get_db)):
 # LIVE SCORE
 # =========================
 
+# @router.get("/{match_id}/live")
+# def get_live_score(match_id: int, db: Session = Depends(get_db)):
+#     match = db.query(models.Match).filter(
+#         models.Match.id == match_id
+#     ).first()
+#
+#     if not match:
+#         raise HTTPException(404, "Match not found")
+#
+#     balls = db.query(models.Ball).filter(
+#         models.Ball.match_id == match_id
+#     ).order_by(models.Ball.id.asc()).all()
+#
+#     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+#     wickets = sum(1 for b in balls if b.is_wicket)
+#
+#     legal_balls = sum(1 for b in balls if b.is_legal_ball)
+#
+#     overs = f"{legal_balls // 6}.{legal_balls % 6}"
+#     score = f"{total_runs}/{wickets}"
+#
+#     last_over = [
+#         "W" if b.is_wicket else str(b.runs or 0)
+#         for b in balls[-6:]
+#     ]
+#
+#     run_rate = round(total_runs / (legal_balls / 6), 2) if legal_balls else 0
+#
+#     # =========================
+#     # 🧑‍🤝‍🧑 ONLY 2 BATSMEN (STRICT)
+#     # =========================
+#     batsmen = db.query(models.Batsman).filter(
+#         models.Batsman.match_id == match_id,
+#         models.Batsman.is_out == False
+#     ).order_by(models.Batsman.id.asc()).limit(2).all()
+#
+#     batsmen_data = []
+#     for b in batsmen:
+#         sr = (b.runs / b.balls * 100) if b.balls > 0 else 0
+#
+#         batsmen_data.append({
+#             "name": b.name,
+#             "runs": b.runs,
+#             "balls": b.balls,
+#             "fours": b.fours,
+#             "sixes": b.sixes,
+#             "sr": round(sr, 1),
+#             "is_striker": b.is_striker
+#         })
+#
+#     # =========================
+#     # 🧠 YET TO BAT (NEW)
+#     # =========================
+#     all_players = db.query(models.PlayingXI).filter(
+#         models.PlayingXI.match_id == match_id
+#     ).all()
+#
+#     batted_names = [
+#         b.name for b in db.query(models.Batsman).filter(
+#             models.Batsman.match_id == match_id
+#         ).all()
+#     ]
+#
+#     yet_to_bat = [
+#         p.player.name for p in all_players
+#         if p.player.name not in batted_names
+#     ]
+#
+#     # =========================
+#     # 🎯 BOWLER
+#     # =========================
+#     bowler_data = {
+#         "name": "Current Bowler",
+#         "overs": overs,
+#         "runs": total_runs,
+#         "wickets": wickets,
+#         "eco": run_rate
+#     }
+#
+#     return {
+#         "score": score,
+#         "overs": overs,
+#         "status": match.note or "Live",
+#         "last_over": last_over,
+#         "batsmen": batsmen_data,
+#         "yet_to_bat": yet_to_bat,  # ✅ NEW
+#         "bowler": bowler_data,
+#         "extras": 0,
+#         "run_rate": run_rate
+#     }
+
+
 @router.get("/{match_id}/live")
 def get_live_score(match_id: int, db: Session = Depends(get_db)):
-    match = db.query(models.Match).filter(
-        models.Match.id == match_id
-    ).first()
-
-    if not match:
-        raise HTTPException(404, "Match not found")
-
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
-    ).order_by(models.Ball.id.asc()).all()
+    ).all()
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
     wickets = sum(1 for b in balls if b.is_wicket)
@@ -258,74 +343,25 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
     overs = f"{legal_balls // 6}.{legal_balls % 6}"
     score = f"{total_runs}/{wickets}"
 
-    last_over = [
-        "W" if b.is_wicket else str(b.runs or 0)
-        for b in balls[-6:]
-    ]
-
-    run_rate = round(total_runs / (legal_balls / 6), 2) if legal_balls else 0
-
-    # =========================
-    # 🧑‍🤝‍🧑 ONLY 2 BATSMEN (STRICT)
-    # =========================
     batsmen = db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id,
         models.Batsman.is_out == False
-    ).order_by(models.Batsman.id.asc()).limit(2).all()
+    ).all()
 
-    batsmen_data = []
-    for b in batsmen:
-        sr = (b.runs / b.balls * 100) if b.balls > 0 else 0
-
-        batsmen_data.append({
+    batsmen_data = [
+        {
             "name": b.name,
             "runs": b.runs,
             "balls": b.balls,
-            "fours": b.fours,
-            "sixes": b.sixes,
-            "sr": round(sr, 1),
             "is_striker": b.is_striker
-        })
-
-    # =========================
-    # 🧠 YET TO BAT (NEW)
-    # =========================
-    all_players = db.query(models.PlayingXI).filter(
-        models.PlayingXI.match_id == match_id
-    ).all()
-
-    batted_names = [
-        b.name for b in db.query(models.Batsman).filter(
-            models.Batsman.match_id == match_id
-        ).all()
+        }
+        for b in batsmen
     ]
-
-    yet_to_bat = [
-        p.player.name for p in all_players
-        if p.player.name not in batted_names
-    ]
-
-    # =========================
-    # 🎯 BOWLER
-    # =========================
-    bowler_data = {
-        "name": "Current Bowler",
-        "overs": overs,
-        "runs": total_runs,
-        "wickets": wickets,
-        "eco": run_rate
-    }
 
     return {
         "score": score,
         "overs": overs,
-        "status": match.note or "Live",
-        "last_over": last_over,
-        "batsmen": batsmen_data,
-        "yet_to_bat": yet_to_bat,  # ✅ NEW
-        "bowler": bowler_data,
-        "extras": 0,
-        "run_rate": run_rate
+        "batsmen": batsmen_data
     }
 
 
@@ -340,8 +376,6 @@ def add_ball(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    # 🔐 ADMIN CHECK
-
     match = db.query(models.Match).get(match_id)
 
     if not match:
@@ -351,7 +385,7 @@ def add_ball(
         raise HTTPException(403, "Not allowed")
 
     # =========================
-    # GET LAST BALL
+    # LAST BALL
     # =========================
     last_ball = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
@@ -359,23 +393,25 @@ def add_ball(
 
     over, ball_num = 0, 1
 
+    is_extra = extra_type in ["wide", "no_ball"]
+
     if last_ball:
         over = last_ball.over
         ball_num = last_ball.ball
 
-        if extra_type not in ["wide", "no_ball"]:
+        if not is_extra:
             ball_num += 1
             if ball_num > 6:
                 over += 1
                 ball_num = 1
 
     # =========================
-    # GET ACTIVE BATSMEN
+    # BATSMEN
     # =========================
     batsmen = db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id,
         models.Batsman.is_out == False
-    ).order_by(models.Batsman.id.asc()).all()
+    ).all()
 
     if len(batsmen) < 2:
         raise HTTPException(400, "Need 2 batsmen")
@@ -384,7 +420,7 @@ def add_ball(
     non_striker = next(b for b in batsmen if not b.is_striker)
 
     # =========================
-    # CREATE BALL ENTRY
+    # SAVE BALL
     # =========================
     new_ball = models.Ball(
         match_id=match_id,
@@ -394,68 +430,41 @@ def add_ball(
 
         batsman_id=striker.player_id,
         non_striker_id=non_striker.player_id,
-        bowler_id=None,  # can improve later
 
         runs=runs,
         extra_type=extra_type,
         extra_runs=extra_runs,
 
         is_wicket=wicket,
-        wicket_type=None,
         player_out_id=striker.player_id if wicket else None,
 
-        is_legal_ball=(extra_type not in ["wide", "no_ball"]),
-        created_at=datetime.utcnow()
+        is_legal_ball=not is_extra
     )
 
     db.add(new_ball)
 
     # =========================
-    # UPDATE BATSMAN STATS
+    # UPDATE STATS
     # =========================
-    if extra_type not in ["wide", "no_ball"]:
+    if not is_extra:
         striker.balls += 1
+        striker.runs += runs
 
-    striker.runs += runs
-
-    if runs == 4:
-        striker.fours += 1
-    elif runs == 6:
-        striker.sixes += 1
+        if runs == 4:
+            striker.fours += 1
+        elif runs == 6:
+            striker.sixes += 1
 
     # =========================
-    # HANDLE WICKET
+    # WICKET
     # =========================
     if wicket:
         striker.is_out = True
         striker.is_striker = False
 
-        # 🔥 MUST PROVIDE NEXT BATSMAN
         if not next_batsman_id:
             db.commit()
-            return {
-                "message": "Wicket! Select next batsman",
-                "need_next_batsman": True
-            }
-
-        # 🔥 VALIDATE PLAYER FROM PLAYING XI
-        xi_players = db.query(models.PlayingXI).filter(
-            models.PlayingXI.match_id == match_id
-        ).all()
-
-        xi_ids = [p.player_id for p in xi_players]
-
-        if next_batsman_id not in xi_ids:
-            raise HTTPException(400, "Invalid player")
-
-        # 🔥 CHECK NOT ALREADY BATTED
-        existing = db.query(models.Batsman).filter(
-            models.Batsman.match_id == match_id,
-            models.Batsman.player_id == next_batsman_id
-        ).first()
-
-        if existing:
-            raise HTTPException(400, "Player already batted")
+            return {"need_next_batsman": True}
 
         player = db.query(models.Player).get(next_batsman_id)
 
@@ -465,19 +474,15 @@ def add_ball(
             name=player.name,
             is_striker=True
         )
-
         db.add(new_batsman)
 
     else:
-        # =========================
-        # STRIKE ROTATION
-        # =========================
         if runs % 2 == 1:
             striker.is_striker = False
             non_striker.is_striker = True
 
     # =========================
-    # OVER COMPLETE
+    # OVER CHANGE
     # =========================
     if ball_num == 6:
         striker.is_striker = not striker.is_striker
@@ -485,29 +490,7 @@ def add_ball(
 
     db.commit()
 
-    # =========================
-    # SCORE CALCULATION
-    # =========================
-    balls = db.query(models.Ball).filter(
-        models.Ball.match_id == match_id
-    ).all()
-
-    total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
-    wickets = sum(1 for b in balls if b.is_wicket)
-
-    legal_balls = sum(
-        1 for b in balls if b.is_legal_ball
-    )
-
-    overs = f"{legal_balls // 6}.{legal_balls % 6}"
-
-    return {
-        "message": "Ball added",
-        "data": {
-            "score": f"{total_runs}/{wickets}",
-            "overs": overs
-        }
-    }
+    return {"message": "Ball added"}
 
 
 
