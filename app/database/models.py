@@ -181,23 +181,54 @@ class Bowler(Base):
 # =========================
 # ⚾ BALL (CORE ENGINE)
 # =========================
+# class Ball(Base):
+#     __tablename__ = "balls"
+#
+#     id = Column(Integer, primary_key=True)
+#
+#     match_id = Column(Integer, ForeignKey("matches.id"))
+#
+#     innings = Column(Integer, default=1)
+#
+#     over = Column(Integer, nullable=False)
+#     ball = Column(Integer, nullable=False)
+#
+#     runs = Column(Integer, default=0)
+#     extra_type = Column(String, nullable=True)
+#     extra_runs = Column(Integer, default=0)
+#
+#     is_wicket = Column(Boolean, default=False)
+#
+#     created_at = Column(DateTime, default=datetime.utcnow)
+
 class Ball(Base):
     __tablename__ = "balls"
 
     id = Column(Integer, primary_key=True)
 
     match_id = Column(Integer, ForeignKey("matches.id"))
-
     innings = Column(Integer, default=1)
 
     over = Column(Integer, nullable=False)
     ball = Column(Integer, nullable=False)
 
+    # 🔥 CORE PLAYERS
+    batsman_id = Column(Integer, ForeignKey("players.id"), nullable=True)
+    non_striker_id = Column(Integer, ForeignKey("players.id"), nullable=True)
+    bowler_id = Column(Integer, ForeignKey("players.id"), nullable=True)
+
+    # 🔥 RUNS
     runs = Column(Integer, default=0)
-    extra_type = Column(String, nullable=True)
+    extra_type = Column(String, nullable=True)  # wide, no_ball, bye
     extra_runs = Column(Integer, default=0)
 
+    # 🔥 WICKET
     is_wicket = Column(Boolean, default=False)
+    wicket_type = Column(String, nullable=True)
+    player_out_id = Column(Integer, ForeignKey("players.id"), nullable=True)
+
+    # 🔥 FLAGS
+    is_legal_ball = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

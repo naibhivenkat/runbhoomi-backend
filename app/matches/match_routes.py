@@ -253,9 +253,7 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
     wickets = sum(1 for b in balls if b.is_wicket)
 
-    legal_balls = sum(
-        1 for b in balls if b.extra_type not in ["wide", "no_ball"]
-    )
+    legal_balls = sum(1 for b in balls if b.is_legal_ball)
 
     overs = f"{legal_balls // 6}.{legal_balls % 6}"
     score = f"{total_runs}/{wickets}"
@@ -333,20 +331,26 @@ def get_live_score(match_id: int, db: Session = Depends(get_db)):
 
 @router.post("/{match_id}/add_ball")
 def add_ball(
-        match_id: int,
-        tournament_id: int,  # 🔥 REQUIRED
-        runs: int = 0,
-        wicket: bool = False,
-        extra_type: str = None,
-        extra_runs: int = 0,
-        db: Session = Depends(get_db),
-        user_id: int = Depends(get_current_user_id)
+    match_id: int,
+    tournament_id: int,
+    runs: int = 0,
+    wicket: bool = False,
+    extra_type: str = None,
+    extra_runs: int = 0,
+    next_batsman_id: int = None,  # 🔥 IMPORTANT
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
 ):
-    # 🔐 BLOCK NON-ADMIN
+    # 🔐 ADMIN CHECK
     require_admin(db, user_id, tournament_id)
 
+    match = db.query(models.Match).get(match_id)
+
+    if not match:
+        raise HTTPException(404, "Match not found")
+
     # =========================
-    # OVER LOGIC
+    # GET LAST BALL
     # =========================
     last_ball = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
@@ -372,51 +376,41 @@ def add_ball(
         models.Batsman.is_out == False
     ).order_by(models.Batsman.id.asc()).all()
 
-    if len(batsmen) > 2:
-        for b in batsmen[2:]:
-            b.is_out = True
-        batsmen = batsmen[:2]
-
-    while len(batsmen) < 2:
-        new = models.Batsman(
-            match_id=match_id,
-            name=f"Player {len(batsmen) + 1}",
-            is_striker=(len(batsmen) == 0)
-        )
-        db.add(new)
-        db.commit()
-        batsmen.append(new)
-
-    # =========================
-    # FIX STRIKER
-    # =========================
-    strikers = [b for b in batsmen if b.is_striker]
-
-    if len(strikers) != 1:
-        batsmen[0].is_striker = True
-        for b in batsmen[1:]:
-            b.is_striker = False
+    if len(batsmen) < 2:
+        raise HTTPException(400, "Need 2 batsmen")
 
     striker = next(b for b in batsmen if b.is_striker)
     non_striker = next(b for b in batsmen if not b.is_striker)
 
     # =========================
-    # CREATE BALL
+    # CREATE BALL ENTRY
     # =========================
     new_ball = models.Ball(
         match_id=match_id,
+        innings=match.current_innings,
         over=over,
         ball=ball_num,
+
+        batsman_id=striker.player_id,
+        non_striker_id=non_striker.player_id,
+        bowler_id=None,  # can improve later
+
         runs=runs,
         extra_type=extra_type,
         extra_runs=extra_runs,
+
         is_wicket=wicket,
+        wicket_type=None,
+        player_out_id=striker.player_id if wicket else None,
+
+        is_legal_ball=(extra_type not in ["wide", "no_ball"]),
         created_at=datetime.utcnow()
     )
+
     db.add(new_ball)
 
     # =========================
-    # UPDATE BATSMAN
+    # UPDATE BATSMAN STATS
     # =========================
     if extra_type not in ["wide", "no_ball"]:
         striker.balls += 1
@@ -429,24 +423,61 @@ def add_ball(
         striker.sixes += 1
 
     # =========================
-    # WICKET
+    # HANDLE WICKET
     # =========================
     if wicket:
         striker.is_out = True
         striker.is_striker = False
 
+        # 🔥 MUST PROVIDE NEXT BATSMAN
+        if not next_batsman_id:
+            db.commit()
+            return {
+                "message": "Wicket! Select next batsman",
+                "need_next_batsman": True
+            }
+
+        # 🔥 VALIDATE PLAYER FROM PLAYING XI
+        xi_players = db.query(models.PlayingXI).filter(
+            models.PlayingXI.match_id == match_id
+        ).all()
+
+        xi_ids = [p.player_id for p in xi_players]
+
+        if next_batsman_id not in xi_ids:
+            raise HTTPException(400, "Invalid player")
+
+        # 🔥 CHECK NOT ALREADY BATTED
+        existing = db.query(models.Batsman).filter(
+            models.Batsman.match_id == match_id,
+            models.Batsman.player_id == next_batsman_id
+        ).first()
+
+        if existing:
+            raise HTTPException(400, "Player already batted")
+
+        player = db.query(models.Player).get(next_batsman_id)
+
         new_batsman = models.Batsman(
             match_id=match_id,
-            name="Next Player",
+            player_id=player.id,
+            name=player.name,
             is_striker=True
         )
+
         db.add(new_batsman)
 
     else:
+        # =========================
+        # STRIKE ROTATION
+        # =========================
         if runs % 2 == 1:
             striker.is_striker = False
             non_striker.is_striker = True
 
+    # =========================
+    # OVER COMPLETE
+    # =========================
     if ball_num == 6:
         striker.is_striker = not striker.is_striker
         non_striker.is_striker = not non_striker.is_striker
@@ -454,7 +485,7 @@ def add_ball(
     db.commit()
 
     # =========================
-    # SCORE RESPONSE
+    # SCORE CALCULATION
     # =========================
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
@@ -464,7 +495,7 @@ def add_ball(
     wickets = sum(1 for b in balls if b.is_wicket)
 
     legal_balls = sum(
-        1 for b in balls if b.extra_type not in ["wide", "no_ball"]
+        1 for b in balls if b.is_legal_ball
     )
 
     overs = f"{legal_balls // 6}.{legal_balls % 6}"
@@ -473,11 +504,10 @@ def add_ball(
         "message": "Ball added",
         "data": {
             "score": f"{total_runs}/{wickets}",
-            "overs": overs,
-            "runs_last_ball": runs + extra_runs,
-            "is_wicket": wicket
+            "overs": overs
         }
     }
+
 
 
 def update_points(
@@ -738,3 +768,156 @@ def get_matches_by_tournament(tournament_id: int, db: Session = Depends(get_db))
         }
         for m in matches
     ]
+
+
+
+@router.post("/{match_id}/next_batsman")
+def select_next_batsman(
+    match_id: int,
+    player_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    match = db.query(models.Match).get(match_id)
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
+
+    # ✅ check player in playing XI
+    xi = db.query(models.PlayingXI).filter(
+        models.PlayingXI.match_id == match_id
+    ).all()
+
+    xi_ids = [p.player_id for p in xi]
+
+    if player_id not in xi_ids:
+        raise HTTPException(400, "Invalid player")
+
+    # ❌ prevent duplicate batting
+    existing = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id,
+        models.Batsman.player_id == player_id
+    ).first()
+
+    if existing:
+        raise HTTPException(400, "Already batted")
+
+    player = db.query(models.Player).get(player_id)
+
+    new_batsman = models.Batsman(
+        match_id=match_id,
+        player_id=player.id,
+        name=player.name,
+        is_striker=True
+    )
+
+    db.add(new_batsman)
+    db.commit()
+
+    return {"message": "New batsman added"}
+
+
+@router.post("/{match_id}/set_bowler")
+def set_bowler(
+    match_id: int,
+    player_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    match = db.query(models.Match).get(match_id)
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
+
+    player = db.query(models.Player).get(player_id)
+
+    if not player:
+        raise HTTPException(404, "Player not found")
+
+    bowler = models.Bowler(
+        match_id=match_id,
+        player_id=player.id,
+        name=player.name,
+        overs="0.0",
+        runs=0,
+        wickets=0,
+        economy=0
+    )
+
+    db.add(bowler)
+    db.commit()
+
+    return {"message": "Bowler set"}
+
+
+
+@router.delete("/{match_id}/undo_ball")
+def undo_ball(
+    match_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    match = db.query(models.Match).get(match_id)
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
+
+    last_ball = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).order_by(models.Ball.id.desc()).first()
+
+    if not last_ball:
+        raise HTTPException(400, "No balls to undo")
+
+    db.delete(last_ball)
+    db.commit()
+
+    return {"message": "Last ball removed"}
+
+
+
+@router.post("/{match_id}/next_innings")
+def next_innings(
+    match_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    match = db.query(models.Match).get(match_id)
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
+
+    if match.current_innings == 2:
+        raise HTTPException(400, "Match already finished")
+
+    match.current_innings = 2
+
+    db.commit()
+
+    return {"message": "Second innings started"}
+
+
+
+@router.post("/{match_id}/finish")
+def finish_match(
+    match_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    match = db.query(models.Match).get(match_id)
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
+
+    balls = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).all()
+
+    total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+
+    match.status = "completed"
+    match.scoreA = total_runs
+
+    db.commit()
+
+    return {"message": "Match completed"}
