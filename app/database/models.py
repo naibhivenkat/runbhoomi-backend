@@ -149,6 +149,7 @@ class Batsman(Base):
 
     id = Column(Integer, primary_key=True)
     match_id = Column(Integer, ForeignKey("matches.id"))
+    player_id = Column(Integer, ForeignKey("players.id"))
 
     name = Column(String)
 
