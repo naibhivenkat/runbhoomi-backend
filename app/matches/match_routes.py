@@ -494,6 +494,21 @@ def add_ball(
 
 
 
+
+@router.post("/{match_id}/reset")
+def reset_match(match_id: int, db: Session = Depends(get_db)):
+    db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).delete()
+
+    db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id
+    ).delete()
+
+    db.commit()
+
+    return {"message": "Match reset"}
+
 def update_points(
         db,
         tournament_id,
