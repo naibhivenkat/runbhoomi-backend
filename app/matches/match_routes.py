@@ -269,7 +269,7 @@ class BallInput(BaseModel):
 @router.post("/{match_id}/add_ball")
 def add_ball(
     match_id: int,
-    payload: BallInput,   # ✅ FIX
+    payload: BallInput,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
@@ -281,11 +281,18 @@ def add_ball(
     if match.admin_id != user_id:
         raise HTTPException(403, "Not allowed")
 
-    runs = payload.runs
+    runs = payload.runs or 0
     wicket = payload.wicket
     extra_type = payload.extra_type
-    extra_runs = payload.extra_runs
     next_batsman_id = payload.next_batsman_id
+
+    # =========================
+    # EXTRA HANDLING (FIXED 🔥)
+    # =========================
+    is_extra = extra_type in ["wide", "no_ball"]
+
+    # Force 1 run for extras
+    extra_runs = 1 if is_extra else 0
 
     # =========================
     # LAST BALL
@@ -295,8 +302,6 @@ def add_ball(
     ).order_by(models.Ball.id.desc()).first()
 
     over, ball_num = 0, 1
-
-    is_extra = extra_type in ["wide", "no_ball"]
 
     if last_ball:
         over = last_ball.over
@@ -330,29 +335,36 @@ def add_ball(
         innings=match.current_innings,
         over=over,
         ball=ball_num,
+
         batsman_id=striker.player_id,
         non_striker_id=non_striker.player_id,
+
         runs=runs,
         extra_type=extra_type,
         extra_runs=extra_runs,
+
         is_wicket=wicket,
         player_out_id=striker.player_id if wicket else None,
+
         is_legal_ball=not is_extra
     )
 
     db.add(new_ball)
 
     # =========================
-    # UPDATE STATS
+    # UPDATE BATSMAN STATS
     # =========================
+    # Ball faced only for legal delivery
     if not is_extra:
         striker.balls += 1
-        striker.runs += runs
 
-        if runs == 4:
-            striker.fours += 1
-        elif runs == 6:
-            striker.sixes += 1
+    # Runs always add (even on no-ball)
+    striker.runs += runs
+
+    if runs == 4:
+        striker.fours += 1
+    elif runs == 6:
+        striker.sixes += 1
 
     # =========================
     # WICKET
@@ -376,21 +388,25 @@ def add_ball(
         db.add(new_batsman)
 
     else:
-        if runs % 2 == 1:
+        # 🔥 STRIKE ROTATION (ONLY ON LEGAL BALLS)
+        if not is_extra and runs % 2 == 1:
             striker.is_striker = False
             non_striker.is_striker = True
 
     # =========================
-    # OVER CHANGE
+    # OVER COMPLETE (FIXED)
     # =========================
-    if ball_num == 6:
+    if not is_extra and ball_num == 6:
         striker.is_striker = not striker.is_striker
         non_striker.is_striker = not non_striker.is_striker
 
     db.commit()
 
-    return {"message": "Ball added"}
-
+    return {
+        "message": "Ball added",
+        "runs_added": runs + extra_runs,
+        "is_extra": is_extra
+    }
 
 
 @router.post("/{match_id}/reset")
