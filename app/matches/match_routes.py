@@ -64,52 +64,42 @@ def create_match(
 
 @router.post("/{match_id}/start_match")
 def start_match(
-        match_id: int,
-        tournament_id: int,
-        striker_id: int,
-        non_striker_id: int,
-        bowler_name: str,
-        db: Session = Depends(get_db),
-        user_id: int = Depends(get_current_user_id)
+    match_id: int,
+    striker_id: int,
+    non_striker_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
 ):
-    # 🔐 ADMIN CHECK
-    require_admin(db, user_id, tournament_id)
-
     match = db.query(models.Match).get(match_id)
 
-    if not match:
-        raise HTTPException(404, "Match not found")
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
 
-    # clear previous
+    # 🔥 CLEAN OLD
     db.query(models.Batsman).filter(
         models.Batsman.match_id == match_id
     ).delete()
 
-    striker_player = db.query(models.Player).get(striker_id)
-    non_striker_player = db.query(models.Player).get(non_striker_id)
+    db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).delete()
 
-    striker = models.Batsman(
+    striker = db.query(models.Player).get(striker_id)
+    non_striker = db.query(models.Player).get(non_striker_id)
+
+    db.add(models.Batsman(
         match_id=match_id,
-        name=striker_player.name,
+        player_id=striker.id,
+        name=striker.name,
         is_striker=True
-    )
+    ))
 
-    non_striker = models.Batsman(
+    db.add(models.Batsman(
         match_id=match_id,
-        name=non_striker_player.name,
+        player_id=non_striker.id,
+        name=non_striker.name,
         is_striker=False
-    )
-
-    bowler = models.Bowler(
-        match_id=match_id,
-        name=bowler_name,
-        overs="0.0",
-        runs=0,
-        wickets=0,
-        economy=0
-    )
-
-    db.add_all([striker, non_striker, bowler])
+    ))
 
     match.status = "live"
 
@@ -118,13 +108,13 @@ def start_match(
     return {"message": "Match started"}
 
 
+
 @router.get("/get_matches")
 def get_matches(email: str, db: Session = Depends(get_db)):
     player = db.query(models.Player).filter(
         models.Player.email == email
     ).first()
 
-    # 🔥 Get matches (filtered or all)
     if not player or not player.team_id:
         matches = db.query(models.Match).options(
             joinedload(models.Match.teamA),
@@ -143,11 +133,8 @@ def get_matches(email: str, db: Session = Depends(get_db)):
 
     for m in matches:
 
-        # ==============================
-        # ✅ LIVE MATCH CALCULATION ONLY
-        # ==============================
+        # ✅ LIVE
         if m.status == "live":
-
             balls = db.query(models.Ball).filter(
                 models.Ball.match_id == m.id
             ).all()
@@ -161,24 +148,15 @@ def get_matches(email: str, db: Session = Depends(get_db)):
 
             overs = f"{legal_balls // 6}.{legal_balls % 6}"
             scoreA = f"{total_runs}/{wickets}" if balls else ""
-
             overs_display = overs
 
-        # ==============================
-        # ✅ COMPLETED / UPCOMING
-        # ==============================
         else:
             scoreA = f"{m.scoreA} ({m.oversA})" if m.scoreA else ""
             overs_display = m.oversA if m.oversA else None
 
-        # ==============================
-        # ✅ SCORE B (COMMON)
-        # ==============================
         scoreB = f"{m.scoreB} ({m.oversB})" if m.scoreB else ""
 
-        # ==============================
-        # ✅ NOTE FIX (IMPORTANT)
-        # ==============================
+        # ✅ NOTE
         if m.status == "completed":
             note = m.note or ""
         elif m.current_innings == 2:
@@ -188,23 +166,30 @@ def get_matches(email: str, db: Session = Depends(get_db)):
         else:
             note = m.note or ""
 
-        # ==============================
-        # ✅ FINAL RESPONSE
-        # ==============================
+        # ✅ OPTIONAL tournament mapping
+        tm = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.match_id == m.id
+        ).first()
+
         result.append({
             "id": m.id,
             "teamA": m.teamA.name if m.teamA else "",
             "teamB": m.teamB.name if m.teamB else "",
 
+            "teamA_id": m.team_a_id,
+            "teamB_id": m.team_b_id,
+
+            # ✅ SAFE
+            "tournament_id": tm.tournament_id if tm else None,
+
+            # ✅ CRITICAL FOR FRONTEND
+            "is_admin": m.admin_id == player.id if player else False,
+
             "scoreA": scoreA,
             "scoreB": scoreB,
-
             "overs": overs_display,
             "status": m.status,
             "note": note,
-
-            "admin_id": m.admin_id,
-            "is_admin": m.admin_id == player.id if player else False
         })
 
     return result
@@ -895,7 +880,27 @@ def next_innings(
 
     return {"message": "Second innings started"}
 
+@router.get("/{match_id}/yet_to_bat")
+def get_yet_to_bat(match_id: int, db: Session = Depends(get_db)):
+    xi = db.query(models.PlayingXI).filter(
+        models.PlayingXI.match_id == match_id
+    ).all()
 
+    batted = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id
+    ).all()
+
+    batted_ids = [b.player_id for b in batted]
+
+    result = [
+        {
+            "id": p.player.id,
+            "name": p.player.name
+        }
+        for p in xi if p.player_id not in batted_ids
+    ]
+
+    return {"players": result}
 
 @router.post("/{match_id}/finish")
 def finish_match(

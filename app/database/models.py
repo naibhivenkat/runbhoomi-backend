@@ -122,6 +122,7 @@ class Match(Base):
 
     playing_xi = relationship("PlayingXI", back_populates="match")
     admin_id = Column(Integer, ForeignKey("players.id"))
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"))
 
 
 # =========================
