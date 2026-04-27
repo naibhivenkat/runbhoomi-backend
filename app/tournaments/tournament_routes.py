@@ -18,6 +18,13 @@ from app.utls.permissions import require_admin
 
 router = APIRouter(prefix="/tournaments")
 
+class JoinRequestPayload(BaseModel):
+    tournament_id: str
+    team_name: str
+    contact: str
+    status: str = "PENDING"
+
+
 class TournamentCreate(BaseModel):
     name: str
     city: str
@@ -588,7 +595,7 @@ def approve_team(
     return {"message": "Approved"}
 
 
-@router.get("/{tournament_id}/requests")
+@router.get("/{tournament_id}/join_request")
 def get_requests(
         tournament_id: str,
         db: Session = Depends(get_db),
@@ -604,10 +611,42 @@ def get_requests(
     return [
         {
             "team_id": t.team.id,
-            "team_name": t.team.name
+            "team_name": t.team.name,
+            # Pass the contact info if you have it in your DB,
+            # otherwise pass a placeholder or the captain's phone number
+            "contact": getattr(t, 'contact', '')
         }
         for t in teams
     ]
+
+
+@router.get("/{tournament_id}/requests")
+def create_join_request(
+    req: JoinRequestPayload,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    # Step A: Create the Team in the database
+    new_team = Team(
+        id=str(uuid.uuid4()),
+        name=req.team_name,
+        captain_id=user_id
+    )
+    db.add(new_team)
+    db.flush() # Flush generates the ID without fully committing yet
+
+    # Step B: Link the team to the tournament with a "pending" status
+    new_request = TournamentTeam(
+        tournament_id=req.tournament_id,
+        team_id=new_team.id,
+        status="pending"
+        # Note: If your TournamentTeam model has a 'contact' column, add it here!
+        # contact=req.contact
+    )
+    db.add(new_request)
+    db.commit()
+
+    return {"status": "success", "message": "Join request submitted!"}
 
 
 @router.post("/{tournament_id}/reject/{team_id}")
