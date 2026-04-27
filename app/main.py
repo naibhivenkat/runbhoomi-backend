@@ -64,17 +64,16 @@ app.include_router(tournament_router)
 # Base & Health Routes
 # =========================
 
-@app.get("/", tags=["System"])
+@app.api_route("/", methods=["GET", "HEAD"], tags=["System"])
 async def home():
     """Root endpoint to verify the API is reachable."""
     return {"status": "✅ RunBhoomi backend running 🚀"}
 
 
-@app.get("/health", tags=["System"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["System"])
 async def health():
     """Health check endpoint for server monitoring."""
     return {"status": "🚀 Backend is Healthy ✅✅"}
-
 
 
 if __name__ == "__main__":
@@ -82,6 +81,14 @@ if __name__ == "__main__":
 
     port = int(os.getenv("PORT", "8000"))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+
+
+
+
+
+
+
 
 
 
