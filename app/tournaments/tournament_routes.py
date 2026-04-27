@@ -25,6 +25,9 @@ class JoinRequestPayload(BaseModel):
     status: str = "PENDING"
 
 
+class RenameTeamPayload(BaseModel):
+    new_name: str
+
 class TournamentCreate(BaseModel):
     name: str
     city: str
@@ -180,6 +183,51 @@ def add_team(tournament_id: str, team_name: str, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Team added"}
+
+
+@router.put("/teams/{team_id}/rename")
+def rename_team(
+        team_id: str,
+        payload: RenameTeamPayload,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)  # Optional: if you want to verify they are logged in
+):
+    # Find the team in the database
+    team = db.query(Team).filter(Team.id == team_id).first()
+
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Update the name and save
+    team.name = payload.new_name
+    db.commit()
+
+    return {"status": "success", "message": f"Team renamed to {team.name}"}
+
+
+# ==========================================
+# 2. REMOVE TEAM ENDPOINT (DELETE)
+# ==========================================
+@router.delete("/teams/{team_id}")
+def delete_team(
+        team_id: str,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)  # Optional: check if admin
+):
+    # 1. Find the link between the tournament and the team
+    tournament_link = db.query(TournamentTeam).filter(TournamentTeam.team_id == team_id).first()
+
+    if tournament_link:
+        db.delete(tournament_link)
+
+    # 2. Find the actual team and delete it
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if team:
+        db.delete(team)
+
+    db.commit()
+
+    return {"status": "success", "message": "Team successfully removed"}
 
 
 @router.get("/")
