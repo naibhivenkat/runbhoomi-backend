@@ -595,7 +595,7 @@ def approve_team(
     return {"message": "Approved"}
 
 
-@router.get("/{tournament_id}/join_request")
+@router.get("/{tournament_id}/request")
 def get_requests(
         tournament_id: str,
         db: Session = Depends(get_db),
