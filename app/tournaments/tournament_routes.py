@@ -620,7 +620,7 @@ def get_requests(
     ]
 
 
-@router.get("/{tournament_id}/requests")
+@router.post("/join_request")
 def create_join_request(
     req: JoinRequestPayload,
     db: Session = Depends(get_db),
