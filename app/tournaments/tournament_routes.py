@@ -315,6 +315,7 @@ def get_tournaments(db: Session = Depends(get_db)):
             "end_date": t.end_date,
             "banner_url": getattr(t, "banner_url", None),
             "logo_url": getattr(t, "logo_url", None),
+            "created_by": t.created_by
         }
         for t in tournaments
     ]
