@@ -139,6 +139,7 @@ def rename_tournament(
 # ==========================================
 # 3. DELETE TOURNAMENT ENDPOINT (DELETE)
 # ==========================================
+
 @router.delete("/{tournament_id}")
 def delete_tournament(
         tournament_id: str,
@@ -151,15 +152,27 @@ def delete_tournament(
     if not tournament:
         raise HTTPException(status_code=404, detail="Tournament not found")
 
-    # Security check: Ensure the user trying to delete is the admin
-    # if tournament.admin_id != user_id:
-    #     raise HTTPException(status_code=403, detail="Not authorized to delete this tournament")
+    try:
+        # 🔥 STEP 1: DELETE CHILD RECORDS FIRST TO PREVENT FOREIGN KEY ERRORS 🔥
 
-    # Delete the tournament (SQLAlchemy will cascade delete matches/teams if configured correctly)
-    db.delete(tournament)
-    db.commit()
+        # 1. Delete from tournament_users (This caused your crash!)
+        db.query(models.TournamentUser).filter(models.TournamentUser.tournament_id == tournament_id).delete()
 
-    return {"status": "success", "message": "Tournament successfully deleted"}
+        # 2. Delete linked teams (Adjust 'models.TournamentTeam' to whatever you named your link table)
+        db.query(models.TournamentTeam).filter(models.TournamentTeam.tournament_id == tournament_id).delete()
+
+        # 3. Delete linked matches (If you have a Match model)
+        db.query(models.Match).filter(models.Match.tournament_id == tournament_id).delete()
+
+        # 🔥 STEP 2: NOW IT IS SAFE TO DELETE THE TOURNAMENT
+        db.delete(tournament)
+        db.commit()
+
+        return {"status": "success", "message": "Tournament successfully deleted"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/matches/{tm_id}/init")
