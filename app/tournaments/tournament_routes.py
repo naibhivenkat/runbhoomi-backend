@@ -18,6 +18,7 @@ from app.utls.permissions import require_admin
 
 router = APIRouter(prefix="/tournaments")
 
+
 class JoinRequestPayload(BaseModel):
     tournament_id: str
     team_name: str
@@ -25,8 +26,13 @@ class JoinRequestPayload(BaseModel):
     status: str = "PENDING"
 
 
+class RenameTournamentPayload(BaseModel):
+    new_name: str
+
+
 class RenameTeamPayload(BaseModel):
     new_name: str
+
 
 class TournamentCreate(BaseModel):
     name: str
@@ -104,6 +110,56 @@ def create_tournament(
         "message": "Tournament created",
         "tournament_id": tournament.id
     }
+
+
+@router.put("/{tournament_id}/rename")
+def rename_tournament(
+        tournament_id: str,
+        payload: RenameTournamentPayload,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)
+):
+    # Find the tournament
+    tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
+
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Security check: Ensure the user trying to rename is the admin (if your schema supports this)
+    # if tournament.admin_id != user_id:
+    #     raise HTTPException(status_code=403, detail="Not authorized to edit this tournament")
+
+    # Update the name and commit
+    tournament.name = payload.new_name
+    db.commit()
+
+    return {"status": "success", "message": f"Tournament renamed to {tournament.name}"}
+
+
+# ==========================================
+# 3. DELETE TOURNAMENT ENDPOINT (DELETE)
+# ==========================================
+@router.delete("/{tournament_id}")
+def delete_tournament(
+        tournament_id: str,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)
+):
+    # Find the tournament
+    tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
+
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Security check: Ensure the user trying to delete is the admin
+    # if tournament.admin_id != user_id:
+    #     raise HTTPException(status_code=403, detail="Not authorized to delete this tournament")
+
+    # Delete the tournament (SQLAlchemy will cascade delete matches/teams if configured correctly)
+    db.delete(tournament)
+    db.commit()
+
+    return {"status": "success", "message": "Tournament successfully deleted"}
 
 
 @router.post("/matches/{tm_id}/init")
@@ -670,9 +726,9 @@ def get_requests(
 
 @router.post("/join_request")
 def create_join_request(
-    req: JoinRequestPayload,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+        req: JoinRequestPayload,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)
 ):
     # Step A: Create the Team in the database
     new_team = Team(
@@ -681,7 +737,7 @@ def create_join_request(
         captain_id=user_id
     )
     db.add(new_team)
-    db.flush() # Flush generates the ID without fully committing yet
+    db.flush()  # Flush generates the ID without fully committing yet
 
     # Step B: Link the team to the tournament with a "pending" status
     new_request = TournamentTeam(
@@ -847,17 +903,6 @@ def get_my_role(
         return {"role": "PLAYER"}
 
     return {"role": record.role}
-
-
-
-
-
-
-
-
-
-
-
 
 # import uuid
 # from datetime import datetime, timedelta
