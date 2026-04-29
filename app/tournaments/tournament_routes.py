@@ -17,7 +17,6 @@ from app.tournaments.group_service import create_groups, generate_knockout, pair
 from app.utls.permissions import require_admin
 from typing import List, Optional
 
-
 router = APIRouter(prefix="/tournaments")
 
 
@@ -62,16 +61,17 @@ class TournamentCreate(BaseModel):
     banner_url: str | None = None
 
 
-
 class OfficialAssignRequest(BaseModel):
     id: str
     name: str
     role: str
 
+
 class UserSearchResponse(BaseModel):
     id: str
     name: str
     phone: str
+
 
 class OfficialResponse(BaseModel):
     id: str
@@ -79,9 +79,9 @@ class OfficialResponse(BaseModel):
     phone: Optional[str] = None
     role: str
 
+
 class GroupUpdateRequest(BaseModel):
     group_name: str
-
 
 
 @router.post("/create")
@@ -214,7 +214,7 @@ def init_match_from_fixture(tm_id: str, db: Session = Depends(get_db)):
     match = models.Match(
         team_a_id=tm.team_a_id,
         team_b_id=tm.team_b_id,
-        tournament_id=tm.tournament_id, 
+        tournament_id=tm.tournament_id,
         status="created"
     )
 
@@ -898,21 +898,44 @@ def create_invite(team_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/teams/join/{code}")
+@router.post("/tournaments/teams/join/{code}")
 def join_team_by_code(code: str, player_id: str, db: Session = Depends(get_db)):
-    invite = db.query(TeamInvite).filter_by(code=code).first()
+    # 1. Look up the invite code in the database
+    invite = db.query(TeamInvite).filter(TeamInvite.code == code).first()
 
     if not invite:
-        raise HTTPException(404, "Invalid code")
+        raise HTTPException(status_code=404, detail="Invalid or expired invite code")
 
-    db.add(TeamPlayer(
+    # 2. Check if the player exists
+    player = db.query(Player).filter(Player.id == player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # 3. Check if the player is already in the team to avoid duplicates
+    existing_member = db.query(TeamPlayer).filter(
+        TeamPlayer.team_id == invite.team_id,
+        TeamPlayer.player_id == player_id
+    ).first()
+
+    if existing_member:
+        return {"message": "You are already a member of this team", "team_id": invite.team_id}
+
+    # 4. Create the new team membership
+    new_member = TeamPlayer(
         team_id=invite.team_id,
-        player_id=player_id
-    ))
+        player_id=player_id,
+        role="Player"  # Default role when joining via code
+    )
 
+    db.add(new_member)
     db.commit()
+    db.refresh(new_member)
 
-    return {"message": "Joined team"}
+    return {
+        "status": "success",
+        "message": "Successfully joined the team",
+        "team_id": invite.team_id
+    }
 
 
 @router.get("/{tournament_id}/groups")
@@ -987,6 +1010,8 @@ def update_team_group(team_id: str, payload: GroupUpdateRequest, db: Session = D
     db.commit()
 
     return {"status": "success", "message": f"Team moved to {group.name}"}
+
+
 @router.get("/{tournament_id}/my-role")
 def get_my_role(
         tournament_id: str,
@@ -1032,12 +1057,13 @@ async def get_tournament_officials(tournament_id: str, db: Session = Depends(get
     for off in officials:
         response_data.append({
             "id": off.user_id,
-            "name": off.user.name, # Eagerly loaded from Player table
+            "name": off.user.name,  # Eagerly loaded from Player table
             "phone": off.user.phone,
             "role": off.role
         })
 
     return response_data
+
 
 @router.post("/{tournament_id}/officials")
 async def assign_tournament_official(
@@ -1098,8 +1124,6 @@ async def remove_tournament_official(
     db.commit()
 
     return {"message": "Official removed successfully", "status": "success"}
-
-
 
 # import uuid
 # from datetime import datetime, timedelta

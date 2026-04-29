@@ -6,8 +6,10 @@ from sqlalchemy.orm import relationship
 
 from app.database.db import Base
 
+
 def generate_uuid():
     return str(uuid.uuid4())
+
 
 # =========================
 # 🏏 TEAM
@@ -25,6 +27,7 @@ class Team(Base):
         "Player",
         foreign_keys=[captain_id]
     )
+
 
 # =========================
 # 👤 PLAYER
@@ -64,6 +67,7 @@ class Player(Base):
     )
     squads = relationship("TeamPlayer", back_populates="player")
 
+
 class EmailOTP(Base):
     __tablename__ = "email_otps"
     # OTPs are generally transient and server-side only, but UUID is safer for consistency
@@ -76,18 +80,18 @@ class EmailOTP(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
 
+
 # =========================
 # 🔗 TEAM PLAYER (SQUAD)
 # =========================
 class TeamPlayer(Base):
     __tablename__ = "team_players"
-
-    id = Column(String, primary_key=True, default=generate_uuid)
-    team_id = Column(String, ForeignKey("teams.id"))
-    player_id = Column(String, ForeignKey("players.id"))
-
-    team = relationship("Team", back_populates="players")
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
+    player_id = Column(String, ForeignKey("players.id"), nullable=False)
+    role = Column(String, default="Player")  # e.g., Captain, Player[cite: 5]
     player = relationship("Player", back_populates="squads")
+
 
 # =========================
 # 🏏 MATCH
@@ -121,6 +125,7 @@ class Match(Base):
     admin_id = Column(String, ForeignKey("players.id"))
     tournament_id = Column(String, ForeignKey("tournaments.id"))
 
+
 # =========================
 # 🔥 PLAYING XI
 # =========================
@@ -136,6 +141,7 @@ class PlayingXI(Base):
     match = relationship("Match", back_populates="playing_xi")
     player = relationship("Player")
     team = relationship("Team")
+
 
 # =========================
 # 🧑‍🤝‍🧑 BATSMAN
@@ -157,6 +163,7 @@ class Batsman(Base):
     is_striker = Column(Boolean, default=False)
     is_out = Column(Boolean, default=False)
 
+
 # =========================
 # 🎯 BOWLER
 # =========================
@@ -172,6 +179,7 @@ class Bowler(Base):
     runs = Column(Integer, default=0)
     wickets = Column(Integer, default=0)
     economy = Column(Float, default=0)
+
 
 # =========================
 # ⚾ BALL (CORE ENGINE)
@@ -202,6 +210,7 @@ class Ball(Base):
     is_legal_ball = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 # =========================
 # 🏆 TOURNAMENT
@@ -238,6 +247,7 @@ class Tournament(Base):
     format = Column(String, default="league")
     overs = Column(Integer, default=6)
 
+
 # =========================
 # 🔗 TOURNAMENT TEAMS
 # =========================
@@ -253,6 +263,7 @@ class TournamentTeam(Base):
 
     tournament = relationship("Tournament", back_populates="teams")
     team = relationship("Team")
+
 
 class TournamentMatch(Base):
     __tablename__ = "tournament_matches"
@@ -277,6 +288,7 @@ class TournamentMatch(Base):
     round = Column(Integer, default=1)
     match_time = Column(String, nullable=True)
 
+
 class TournamentPoints(Base):
     __tablename__ = "tournament_points"
 
@@ -298,6 +310,7 @@ class TournamentPoints(Base):
     points = Column(Integer, default=0)
     ties = Column(Integer, default=0)
 
+
 # =========================
 # 🧩 NEW: GROUPS
 # =========================
@@ -308,6 +321,7 @@ class TournamentGroup(Base):
     tournament_id = Column(String, ForeignKey("tournaments.id"))
     name = Column(String)
 
+
 class GroupTeam(Base):
     __tablename__ = "group_teams"
 
@@ -315,13 +329,14 @@ class GroupTeam(Base):
     group_id = Column(String, ForeignKey("tournament_groups.id"))
     team_id = Column(String, ForeignKey("teams.id"))
 
+
 class TeamInvite(Base):
     __tablename__ = "team_invites"
-
-    id = Column(String, primary_key=True, default=generate_uuid)
-    team_id = Column(String, ForeignKey("teams.id"))
-    code = Column(String, unique=True)
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    team_id = Column(String, ForeignKey("teams.id"), nullable=False)
+    code = Column(String(8), unique=True, nullable=False)  # The 8-digit code[cite: 5]
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
 class TournamentUser(Base):
     __tablename__ = "tournament_users"
@@ -354,11 +369,6 @@ class TournamentOfficial(Base):
 
     role = Column(String, nullable=False)
     user = relationship("Player")
-
-
-
-
-
 
 # from datetime import datetime
 #
