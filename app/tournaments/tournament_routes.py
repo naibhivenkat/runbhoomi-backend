@@ -11,10 +11,12 @@ from app.auth.deps import get_current_user_id
 from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam, TeamInvite, \
-    TeamPlayer, TournamentGroup, TournamentUser
+    TeamPlayer, TournamentGroup, TournamentUser, TournamentOfficial, User, Player
 from app.tournaments.group_service import create_groups, generate_knockout, paired_rounds, \
     get_match_duration
 from app.utls.permissions import require_admin
+from typing import List, Optional
+
 
 router = APIRouter(prefix="/tournaments")
 
@@ -58,6 +60,28 @@ class TournamentCreate(BaseModel):
 
     logo_url: str | None = None
     banner_url: str | None = None
+
+
+
+class OfficialAssignRequest(BaseModel):
+    id: int        # The global User ID of the searched user
+    name: str      # Name of the user
+    role: str      # "SCORER" or "UMPIRE"
+
+class UserSearchResponse(BaseModel):
+    id: int
+    name: str
+    phone: str
+
+class OfficialResponse(BaseModel):
+    id: int
+    name: str
+    phone: Optional[str] = None
+    role: str
+
+class GroupUpdateRequest(BaseModel):
+    group_name: str
+
 
 
 @router.post("/create")
@@ -902,6 +926,48 @@ def get_groups(tournament_id: str, db: Session = Depends(get_db)):
     ]
 
 
+@router.put("/teams/{team_id}/group")
+def update_team_group(team_id: str, payload: GroupUpdateRequest, db: Session = Depends(get_db)):
+    """
+    Updates a team's group. If the group doesn't exist, it creates it automatically.
+    """
+    # 1. Find the team
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # 2. Handle un-assigning (moving back to "No Group")
+    if payload.group_name == "No Group":
+        team.group_id = None
+        # team.group_name = "No Group" # Uncomment if your Team model stores the string directly too
+        db.commit()
+        return {"status": "success", "message": "Team removed from group"}
+
+    # 3. Find or Create the Group in the TournamentGroup table
+    group = db.query(TournamentGroup).filter(
+        TournamentGroup.tournament_id == team.tournament_id,
+        TournamentGroup.name == payload.group_name
+    ).first()
+
+    if not group:
+        # The admin typed a Custom Group that doesn't exist yet! Let's create it.
+        group = TournamentGroup(
+            tournament_id=team.tournament_id,
+            name=payload.group_name
+        )
+        db.add(group)
+        db.commit()
+        db.refresh(group)
+
+    # 4. Link the team to the group's ID
+    team.group_id = group.id
+
+    # NOTE: If your Team model also stores `group_name` as a string for easy frontend access, update it here:
+    # team.group_name = group.name
+
+    db.commit()
+
+    return {"status": "success", "message": f"Team moved to {group.name}"}
 @router.get("/{tournament_id}/my-role")
 def get_my_role(
         tournament_id: str,
@@ -917,6 +983,104 @@ def get_my_role(
         return {"role": "PLAYER"}
 
     return {"role": record.role}
+
+
+@router.get("/users/search", response_model=UserSearchResponse)
+async def search_user_by_phone(phone: str, db: Session = Depends(get_db)):
+    # 🔥 CHANGE: Search the Player table
+    user = db.query(Player).filter(Player.phone == phone).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found with this mobile number")
+
+    return {
+        "id": user.id,
+        "name": user.name,
+        "phone": user.phone
+    }
+
+
+@router.get("/{tournament_id}/officials")
+async def get_tournament_officials(tournament_id: str, db: Session = Depends(get_db)):
+    """
+    Fetches all officials assigned to a specific tournament.
+    """
+    officials = db.query(TournamentOfficial).filter(
+        TournamentOfficial.tournament_id == tournament_id
+    ).all()
+
+    response_data = []
+    for off in officials:
+        response_data.append({
+            "id": off.user_id,
+            "name": off.user.name, # Eagerly loaded from Player table
+            "phone": off.user.phone,
+            "role": off.role
+        })
+
+    return response_data
+
+@router.post("/{tournament_id}/officials")
+async def assign_tournament_official(
+        tournament_id: str,
+        official: OfficialAssignRequest,
+        db: Session = Depends(get_db)
+):
+    """
+    Assigns a user as a Scorer or Umpire to a tournament.
+    """
+    # 1. Verify the user actually exists in the global users table
+    user = db.query(User).filter(User.id == official.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in the system")
+
+    # 2. Prevent duplicates (Don't let the same user be added twice to the same tournament)
+    existing_official = db.query(TournamentOfficial).filter(
+        TournamentOfficial.tournament_id == tournament_id,
+        TournamentOfficial.user_id == official.id
+    ).first()
+
+    if existing_official:
+        raise HTTPException(status_code=400, detail=f"User is already assigned as {existing_official.role}")
+
+    # 3. Create the new official record
+    new_official = TournamentOfficial(
+        tournament_id=tournament_id,
+        user_id=official.id,
+        role=official.role.upper()  # Ensure role is always uppercase (SCORER/UMPIRE)
+    )
+
+    db.add(new_official)
+    db.commit()
+
+    return {"message": "Official assigned successfully", "status": "success"}
+
+
+@router.delete("/tournaments/{tournament_id}/officials/{user_id}")
+async def remove_tournament_official(
+        tournament_id: str,
+        user_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Removes an official from a tournament.
+    """
+    # Find the specific mapping record
+    record = db.query(TournamentOfficial).filter(
+        TournamentOfficial.tournament_id == tournament_id,
+        TournamentOfficial.user_id == user_id
+    ).first()
+
+    if not record:
+        raise HTTPException(status_code=404, detail="Official record not found")
+
+    # Delete and commit
+    db.delete(record)
+    db.commit()
+
+    return {"message": "Official removed successfully", "status": "success"}
+
+
 
 # import uuid
 # from datetime import datetime, timedelta
