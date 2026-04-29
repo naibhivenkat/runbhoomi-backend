@@ -22,11 +22,11 @@ class Team(Base):
 
     captain_id = Column(String, ForeignKey("players.id"))
 
-    players = relationship("TeamPlayer", back_populates="team")
     captain = relationship(
         "Player",
         foreign_keys=[captain_id]
     )
+    players = relationship("TeamPlayer", back_populates="team", cascade="all, delete-orphan")
 
 
 # =========================
@@ -66,6 +66,7 @@ class Player(Base):
         foreign_keys=[team_id]
     )
     squads = relationship("TeamPlayer", back_populates="player")
+    team_memberships = relationship("TeamPlayer", back_populates="player")
 
 
 class EmailOTP(Base):
@@ -86,11 +87,12 @@ class EmailOTP(Base):
 # =========================
 class TeamPlayer(Base):
     __tablename__ = "team_players"
+    player = relationship("Player", back_populates="squads")
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     team_id = Column(String, ForeignKey("teams.id"), nullable=False)
     player_id = Column(String, ForeignKey("players.id"), nullable=False)
-    role = Column(String, default="Player")  # e.g., Captain, Player[cite: 5]
-    player = relationship("Player", back_populates="squads")
+    role = Column(String, default="Player")
+    team = relationship("Team", back_populates="players")
 
 
 # =========================
