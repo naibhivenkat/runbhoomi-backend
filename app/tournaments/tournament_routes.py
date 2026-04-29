@@ -945,7 +945,7 @@ def update_team_group(team_id: str, payload: GroupUpdateRequest, db: Session = D
 
     # 3. Find or Create the Group in the TournamentGroup table
     group = db.query(TournamentGroup).filter(
-        TournamentGroup.tournament_id == team.tournament_id,
+        TournamentGroup.id == team.tournament_id,
         TournamentGroup.name == payload.group_name
     ).first()
 
