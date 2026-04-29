@@ -898,7 +898,7 @@ def create_invite(team_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/tournaments/teams/join/{code}")
+@router.post("/teams/join/{code}")
 def join_team_by_code(code: str, player_id: str, db: Session = Depends(get_db)):
     # 1. Look up the invite code in the database
     invite = db.query(TeamInvite).filter(TeamInvite.code == code).first()
@@ -1101,7 +1101,7 @@ async def assign_tournament_official(
     return {"message": "Official assigned successfully", "status": "success"}
 
 
-@router.delete("/tournaments/{tournament_id}/officials/{user_id}")
+@router.delete("/{tournament_id}/officials/{user_id}")
 async def remove_tournament_official(
         tournament_id: str,
         user_id: int,
