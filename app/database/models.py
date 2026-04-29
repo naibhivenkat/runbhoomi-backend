@@ -350,13 +350,9 @@ class TournamentOfficial(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tournament_id = Column(String, index=True, nullable=False)
-
-    # 🔥 CHANGE: Point to players.id instead of users.id
-    user_id = Column(Integer, ForeignKey("players.id"), nullable=False)
+    user_id = Column(String, ForeignKey("players.id"), nullable=False)
 
     role = Column(String, nullable=False)
-
-    # 🔥 CHANGE: Tell SQLAlchemy the relationship is with the Player model
     user = relationship("Player")
 
 

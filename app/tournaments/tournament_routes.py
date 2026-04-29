@@ -64,17 +64,17 @@ class TournamentCreate(BaseModel):
 
 
 class OfficialAssignRequest(BaseModel):
-    id: int        # The global User ID of the searched user
-    name: str      # Name of the user
-    role: str      # "SCORER" or "UMPIRE"
+    id: str
+    name: str
+    role: str
 
 class UserSearchResponse(BaseModel):
-    id: int
+    id: str
     name: str
     phone: str
 
 class OfficialResponse(BaseModel):
-    id: int
+    id: str
     name: str
     phone: Optional[str] = None
     role: str
@@ -214,6 +214,7 @@ def init_match_from_fixture(tm_id: str, db: Session = Depends(get_db)):
     match = models.Match(
         team_a_id=tm.team_a_id,
         team_b_id=tm.team_b_id,
+        tournament_id=tm.tournament_id, 
         status="created"
     )
 
@@ -929,42 +930,60 @@ def get_groups(tournament_id: str, db: Session = Depends(get_db)):
 @router.put("/teams/{team_id}/group")
 def update_team_group(team_id: str, payload: GroupUpdateRequest, db: Session = Depends(get_db)):
     """
-    Updates a team's group. If the group doesn't exist, it creates it automatically.
+    Updates a team's group using the GroupTeam mapping table.
     """
     # 1. Find the team
     team = db.query(Team).filter(Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    # 2. Handle un-assigning (moving back to "No Group")
+    # 2. Find which tournament this team belongs to
+    # (Assuming the team is only in one active tournament for this context)
+    tournament_link = db.query(TournamentTeam).filter(TournamentTeam.team_id == team_id).first()
+    if not tournament_link:
+        raise HTTPException(status_code=400, detail="Team is not registered in any tournament")
+
+    tournament_id = tournament_link.tournament_id
+
+    # 3. Remove the team's current group assignment for this tournament
+    old_mappings = db.query(GroupTeam).join(
+        TournamentGroup, GroupTeam.group_id == TournamentGroup.id
+    ).filter(
+        GroupTeam.team_id == team_id,
+        TournamentGroup.tournament_id == tournament_id
+    ).all()
+
+    for old in old_mappings:
+        db.delete(old)
+
+    db.flush()  # Execute deletes before adding new ones
+
+    # 4. Handle un-assigning (moving back to "No Group")
     if payload.group_name == "No Group":
-        team.group_id = None
-        # team.group_name = "No Group" # Uncomment if your Team model stores the string directly too
         db.commit()
         return {"status": "success", "message": "Team removed from group"}
 
-    # 3. Find or Create the Group in the TournamentGroup table
+    # 5. Find or Create the Group in the TournamentGroup table
     group = db.query(TournamentGroup).filter(
-        TournamentGroup.id == team.tournament_id,
+        TournamentGroup.tournament_id == tournament_id,
         TournamentGroup.name == payload.group_name
     ).first()
 
     if not group:
         # The admin typed a Custom Group that doesn't exist yet! Let's create it.
         group = TournamentGroup(
-            tournament_id=team.tournament_id,
+            tournament_id=tournament_id,
             name=payload.group_name
         )
         db.add(group)
-        db.commit()
-        db.refresh(group)
+        db.flush()  # Generate the group.id immediately
 
-    # 4. Link the team to the group's ID
-    team.group_id = group.id
-
-    # NOTE: If your Team model also stores `group_name` as a string for easy frontend access, update it here:
-    # team.group_name = group.name
-
+    # 6. Link the team to the group using the GroupTeam mapping table
+    new_mapping = GroupTeam(
+        group_id=group.id,
+        team_id=team.id
+    )
+    db.add(new_mapping)
     db.commit()
 
     return {"status": "success", "message": f"Team moved to {group.name}"}
@@ -1030,7 +1049,7 @@ async def assign_tournament_official(
     Assigns a user as a Scorer or Umpire to a tournament.
     """
     # 1. Verify the user actually exists in the global users table
-    user = db.query(User).filter(User.id == official.id).first()
+    user = db.query(Player).filter(Player.id == official.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found in the system")
 
