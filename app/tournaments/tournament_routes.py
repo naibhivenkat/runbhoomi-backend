@@ -327,7 +327,7 @@ def delete_team(
 
     return {"status": "success", "message": "Team successfully removed"}
 
-
+@router.get("")
 @router.get("/")
 def get_tournaments(db: Session = Depends(get_db)):
     tournaments = db.query(models.Tournament).all()
