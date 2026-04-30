@@ -1132,7 +1132,7 @@ async def remove_tournament_official(
 
 
 
-@router.patch("/{team_id}/players/{player_id}/role")
+@router.patch("/teams/{team_id}/players/{player_id}/role")
 def update_player_role(
     team_id: str,
     player_id: str,
@@ -1156,7 +1156,7 @@ def update_player_role(
 
 # 2. REMOVE PLAYER FROM TEAM
 # Endpoint: DELETE /teams/{team_id}/players/{player_id}
-@router.delete("/{team_id}/players/{player_id}")
+@router.delete("/teams/{team_id}/players/{player_id}")
 def remove_player_from_team(
     team_id: str,
     player_id: str,
