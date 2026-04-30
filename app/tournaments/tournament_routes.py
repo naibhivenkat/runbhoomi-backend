@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime, timedelta
 
+from celery.utils.serialization import jsonify
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query
+import request
 from pydantic import BaseModel
 from sqlalchemy import cast, Time
 from sqlalchemy.orm import Session
@@ -1130,31 +1132,57 @@ async def remove_tournament_official(
     return {"message": "Official removed successfully", "status": "success"}
 
 
-
 @router.patch("/teams/{team_id}/players/{player_id}/details")
 def update_player_details(
-    team_id: str,
-    player_id: str,
-    payload: dict, # Contains player_type, is_captain, etc.
-    db: Session = Depends(get_db)
+        team_id: str,
+        player_id: str,
+        payload: dict,  # Receives the full JSON from Flutter
+        db: Session = Depends(get_db),
+        current_user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Query using your TeamPlayer model
     player_entry = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == team_id,
         models.TeamPlayer.player_id == player_id
     ).first()
 
     if not player_entry:
-        raise HTTPException(status_code=404, detail="Player not found")
+        raise HTTPException(status_code=404, detail="Player not found in this team")
 
-    # Update fields dynamically from payload
-    player_entry.player_type = payload.get("player_type", player_entry.player_type)
-    player_entry.is_captain = payload.get("is_captain", player_entry.is_captain)
-    player_entry.is_vc = payload.get("is_vc", player_entry.is_vc)
-    player_entry.is_wk = payload.get("is_wk", player_entry.is_wk)
+    # 2. Update Metadata Fields
+    if "player_type" in payload:
+        player_entry.player_type = payload.get("player_type")
 
-    db.commit()
-    return {"message": "Details updated successfully"}
+    if "is_captain" in payload:
+        player_entry.is_captain = bool(payload.get("is_captain"))
 
+    if "is_vc" in payload:
+        player_entry.is_vc = bool(payload.get("is_vc"))
+
+    if "is_wk" in payload:
+        player_entry.is_wk = bool(payload.get("is_wk"))
+
+    # 3. Update the Role (The missing part!)
+    # This ensures "ADMIN" or "PLAYER" is actually saved to the database
+    if "role" in payload:
+        player_entry.role = str(payload.get("role")).upper()
+
+    # 4. Save to Database
+    try:
+        db.commit()
+        db.refresh(player_entry)
+        return {
+            "status": "success",
+            "message": "Player details and role updated successfully",
+            "data": {
+                "role": player_entry.role,
+                "is_captain": player_entry.is_captain,
+                "player_type": player_entry.player_type
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/teams/{team_id}/players/{player_id}/role")
 def update_player_role(
