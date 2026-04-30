@@ -1131,15 +1131,67 @@ async def remove_tournament_official(
     return {"message": "Official removed successfully", "status": "success"}
 
 
+# @router.patch("/teams/{team_id}/players/{player_id}/details")
+# def update_player_details(
+#         team_id: str,
+#         player_id: str,
+#         payload: dict,  # Receives the full JSON from Flutter
+#         db: Session = Depends(get_db),
+#         current_user_id: str = Depends(get_current_user_id)
+# ):
+#     # 1. Query using your TeamPlayer model
+#     player_entry = db.query(models.TeamPlayer).filter(
+#         models.TeamPlayer.team_id == team_id,
+#         models.TeamPlayer.player_id == player_id
+#     ).first()
+#
+#     if not player_entry:
+#         raise HTTPException(status_code=404, detail="Player not found in this team")
+#
+#     # 2. Update Metadata Fields
+#     if "player_type" in payload:
+#         player_entry.player_type = payload.get("player_type")
+#
+#     if "is_captain" in payload:
+#         player_entry.is_captain = bool(payload.get("is_captain"))
+#
+#     if "is_vc" in payload:
+#         player_entry.is_vc = bool(payload.get("is_vc"))
+#
+#     if "is_wk" in payload:
+#         player_entry.is_wk = bool(payload.get("is_wk"))
+#
+#     # 3. Update the Role (The missing part!)
+#     # This ensures "ADMIN" or "PLAYER" is actually saved to the database
+#     if "role" in payload:
+#         player_entry.role = str(payload.get("role")).upper()
+#
+#     # 4. Save to Database
+#     try:
+#         db.commit()
+#         db.refresh(player_entry)
+#         return {
+#             "status": "success",
+#             "message": "Player details and role updated successfully",
+#             "data": {
+#                 "role": player_entry.role,
+#                 "is_captain": player_entry.is_captain,
+#                 "player_type": player_entry.player_type
+#             }
+#         }
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail=str(e))
+
 @router.patch("/teams/{team_id}/players/{player_id}/details")
 def update_player_details(
         team_id: str,
         player_id: str,
-        payload: dict,  # Receives the full JSON from Flutter
+        payload: dict,
         db: Session = Depends(get_db),
         current_user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Query using your TeamPlayer model
+    # 1. Get the target player
     player_entry = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == team_id,
         models.TeamPlayer.player_id == player_id
@@ -1148,7 +1200,30 @@ def update_player_details(
     if not player_entry:
         raise HTTPException(status_code=404, detail="Player not found in this team")
 
-    # 2. Update Metadata Fields
+    # --- NEW: GLOBAL RESET LOGIC ---
+    # If this player is becoming Captain, remove Captain status from all others in the team
+    if payload.get("is_captain") is True:
+        db.query(models.TeamPlayer).filter(
+            models.TeamPlayer.team_id == team_id,
+            models.TeamPlayer.player_id != player_id
+        ).update({models.TeamPlayer.is_captain: False})
+
+    # If this player is becoming VC, remove VC status from all others
+    if payload.get("is_vc") is True:
+        db.query(models.TeamPlayer).filter(
+            models.TeamPlayer.team_id == team_id,
+            models.TeamPlayer.player_id != player_id
+        ).update({models.TeamPlayer.is_vc: False})
+
+    # If your business logic only allows ONE Admin per team:
+    if str(payload.get("role")).upper() == "ADMIN":
+        db.query(models.TeamPlayer).filter(
+            models.TeamPlayer.team_id == team_id,
+            models.TeamPlayer.player_id != player_id
+        ).update({models.TeamPlayer.role: "PLAYER"})
+    # -------------------------------
+
+    # 2. Update Target Player Fields
     if "player_type" in payload:
         player_entry.player_type = payload.get("player_type")
 
@@ -1161,28 +1236,24 @@ def update_player_details(
     if "is_wk" in payload:
         player_entry.is_wk = bool(payload.get("is_wk"))
 
-    # 3. Update the Role (The missing part!)
-    # This ensures "ADMIN" or "PLAYER" is actually saved to the database
     if "role" in payload:
         player_entry.role = str(payload.get("role")).upper()
 
-    # 4. Save to Database
     try:
         db.commit()
         db.refresh(player_entry)
         return {
             "status": "success",
-            "message": "Player details and role updated successfully",
+            "message": "Player roles updated and previous holders demoted",
             "data": {
                 "role": player_entry.role,
                 "is_captain": player_entry.is_captain,
-                "player_type": player_entry.player_type
+                "is_vc": player_entry.is_vc
             }
         }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.patch("/teams/{team_id}/players/{player_id}/role")
 def update_player_role(
