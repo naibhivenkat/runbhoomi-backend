@@ -84,6 +84,10 @@ class GroupUpdateRequest(BaseModel):
     group_name: str
 
 
+class RoleUpdate(BaseModel):
+    role: str
+
+
 @router.post("/create")
 def create_tournament(
         data: dict,
@@ -1124,6 +1128,54 @@ async def remove_tournament_official(
     db.commit()
 
     return {"message": "Official removed successfully", "status": "success"}
+
+
+
+
+@router.patch("/{team_id}/players/{player_id}/role")
+def update_player_role(
+    team_id: str,
+    player_id: str,
+    payload: RoleUpdate,
+    db: Session = Depends(get_db),
+    current_user_id: str = Depends(get_current_user_id)
+):
+    # Optional: Verify current_user_id has permission to change roles
+    player_entry = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == team_id,
+        models.TeamPlayer.player_id == player_id
+    ).first()
+
+    if not player_entry:
+        raise HTTPException(status_code=404, detail="Player not found in this team")
+
+    player_entry.role = payload.role
+    db.commit()
+    return {"message": f"Player role updated to {payload.role}"}
+
+
+# 2. REMOVE PLAYER FROM TEAM
+# Endpoint: DELETE /teams/{team_id}/players/{player_id}
+@router.delete("/{team_id}/players/{player_id}")
+def remove_player_from_team(
+    team_id: str,
+    player_id: str,
+    db: Session = Depends(get_db),
+    current_user_id: str = Depends(get_current_user_id)
+):
+    player_entry = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == team_id,
+        models.TeamPlayer.player_id == player_id
+    ).first()
+
+    if not player_entry:
+        raise HTTPException(status_code=404, detail="Player entry not found")
+
+    db.delete(player_entry)
+    db.commit()
+    return {"message": "Player removed from team successfully"}
+
+
 
 # import uuid
 # from datetime import datetime, timedelta
