@@ -1,10 +1,9 @@
 import uuid
 from datetime import datetime, timedelta
+from typing import Optional
 
-from celery.utils.serialization import jsonify
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query
-import request
 from pydantic import BaseModel
 from sqlalchemy import cast, Time
 from sqlalchemy.orm import Session
@@ -13,11 +12,10 @@ from app.auth.deps import get_current_user_id
 from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentTeam, TournamentPoints, TournamentMatch, Team, GroupTeam, TeamInvite, \
-    TeamPlayer, TournamentGroup, TournamentUser, TournamentOfficial, User, Player
+    TeamPlayer, TournamentGroup, TournamentUser, TournamentOfficial, Player
 from app.tournaments.group_service import create_groups, generate_knockout, paired_rounds, \
     get_match_duration
 from app.utls.permissions import require_admin
-from typing import List, Optional
 
 router = APIRouter(prefix="/tournaments")
 
@@ -328,6 +326,7 @@ def delete_team(
     db.commit()
 
     return {"status": "success", "message": "Team successfully removed"}
+
 
 @router.get("")
 @router.get("/")
@@ -1184,13 +1183,14 @@ def update_player_details(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.patch("/teams/{team_id}/players/{player_id}/role")
 def update_player_role(
-    team_id: str,
-    player_id: str,
-    payload: RoleUpdate,
-    db: Session = Depends(get_db),
-    current_user_id: str = Depends(get_current_user_id)
+        team_id: str,
+        player_id: str,
+        payload: RoleUpdate,
+        db: Session = Depends(get_db),
+        current_user_id: str = Depends(get_current_user_id)
 ):
     # Verify the player is in the team
     player_entry = db.query(models.TeamPlayer).filter(
@@ -1201,17 +1201,18 @@ def update_player_role(
     if not player_entry:
         raise HTTPException(status_code=404, detail="Player not found in this team")
 
-    player_entry.role = payload.role.upper() # Store as ADMIN or CAPTAIN
+    player_entry.role = payload.role.upper()  # Store as ADMIN or CAPTAIN
     db.commit()
     return {"message": f"Role updated to {payload.role}"}
+
 
 # 2. REMOVE PLAYER (Endpoint: /tournaments/teams/{team_id}/players/{player_id})
 @router.delete("/teams/{team_id}/players/{player_id}")
 def remove_player_from_team(
-    team_id: str,
-    player_id: str,
-    db: Session = Depends(get_db),
-    current_user_id: str = Depends(get_current_user_id)
+        team_id: str,
+        player_id: str,
+        db: Session = Depends(get_db),
+        current_user_id: str = Depends(get_current_user_id)
 ):
     player_entry = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == team_id,
@@ -1224,8 +1225,6 @@ def remove_player_from_team(
     db.delete(player_entry)
     db.commit()
     return {"message": "Player removed successfully"}
-
-
 
 # import uuid
 # from datetime import datetime, timedelta
