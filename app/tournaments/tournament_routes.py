@@ -1131,6 +1131,30 @@ async def remove_tournament_official(
 
 
 
+@router.patch("/teams/{team_id}/players/{player_id}/details")
+def update_player_details(
+    team_id: str,
+    player_id: str,
+    payload: dict, # Contains player_type, is_captain, etc.
+    db: Session = Depends(get_db)
+):
+    player_entry = db.query(models.TeamPlayer).filter(
+        models.TeamPlayer.team_id == team_id,
+        models.TeamPlayer.player_id == player_id
+    ).first()
+
+    if not player_entry:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # Update fields dynamically from payload
+    player_entry.player_type = payload.get("player_type", player_entry.player_type)
+    player_entry.is_captain = payload.get("is_captain", player_entry.is_captain)
+    player_entry.is_vc = payload.get("is_vc", player_entry.is_vc)
+    player_entry.is_wk = payload.get("is_wk", player_entry.is_wk)
+
+    db.commit()
+    return {"message": "Details updated successfully"}
+
 
 @router.patch("/teams/{team_id}/players/{player_id}/role")
 def update_player_role(

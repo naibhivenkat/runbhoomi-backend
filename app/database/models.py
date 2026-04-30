@@ -93,6 +93,10 @@ class TeamPlayer(Base):
     player_id = Column(String, ForeignKey("players.id"), nullable=False)
     role = Column(String, default="Player")
     team = relationship("Team", back_populates="players")
+    player_type = Column(String, default="Batsman")
+    is_captain = Column(Boolean, default=False)
+    is_vc = Column(Boolean, default=False)
+    is_wk = Column(Boolean, default=False)
 
 
 # =========================
