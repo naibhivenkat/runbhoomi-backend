@@ -1140,7 +1140,7 @@ def update_player_role(
     db: Session = Depends(get_db),
     current_user_id: str = Depends(get_current_user_id)
 ):
-    # Optional: Verify current_user_id has permission to change roles
+    # Verify the player is in the team
     player_entry = db.query(models.TeamPlayer).filter(
         models.TeamPlayer.team_id == team_id,
         models.TeamPlayer.player_id == player_id
@@ -1149,13 +1149,11 @@ def update_player_role(
     if not player_entry:
         raise HTTPException(status_code=404, detail="Player not found in this team")
 
-    player_entry.role = payload.role
+    player_entry.role = payload.role.upper() # Store as ADMIN or CAPTAIN
     db.commit()
-    return {"message": f"Player role updated to {payload.role}"}
+    return {"message": f"Role updated to {payload.role}"}
 
-
-# 2. REMOVE PLAYER FROM TEAM
-# Endpoint: DELETE /teams/{team_id}/players/{player_id}
+# 2. REMOVE PLAYER (Endpoint: /tournaments/teams/{team_id}/players/{player_id})
 @router.delete("/teams/{team_id}/players/{player_id}")
 def remove_player_from_team(
     team_id: str,
@@ -1173,7 +1171,7 @@ def remove_player_from_team(
 
     db.delete(player_entry)
     db.commit()
-    return {"message": "Player removed from team successfully"}
+    return {"message": "Player removed successfully"}
 
 
 
