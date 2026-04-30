@@ -168,15 +168,37 @@ def set_playing_xi(
     return {"message": "Playing XI set"}
 
 
+# @router.get("/teams/{team_id}/players")
+# def get_team_players(team_id: str, db: Session = Depends(get_db)):
+#     team_players = db.query(models.TeamPlayer).filter(models.TeamPlayer.team_id == team_id).all()
+#     result = []
+#     for tp in team_players:
+#         player = db.query(models.Player).get(tp.player_id)
+#         if player:
+#             result.append({"id": player.id, "name": player.name})
+#     return result
+
 @router.get("/teams/{team_id}/players")
 def get_team_players(team_id: str, db: Session = Depends(get_db)):
-    team_players = db.query(models.TeamPlayer).filter(models.TeamPlayer.team_id == team_id).all()
-    result = []
-    for tp in team_players:
-        player = db.query(models.Player).get(tp.player_id)
-        if player:
-            result.append({"id": player.id, "name": player.name})
-    return result
+    # Join TeamPlayer with Player to get both Name and Team-specific roles
+    results = db.query(models.Player, models.TeamPlayer).join(
+        models.TeamPlayer, models.Player.id == models.TeamPlayer.player_id
+    ).filter(models.TeamPlayer.team_id == team_id).all()
+
+    players_list = []
+    for player_obj, team_meta in results:
+        players_list.append({
+            "id": player_obj.id,
+            "name": player_obj.name,
+            "phone": player_obj.phone,
+            "role": team_meta.role,  # From team_players table
+            "player_type": team_meta.player_type,
+            "is_captain": team_meta.is_captain,
+            "is_vc": team_meta.is_vc,
+            "is_wk": team_meta.is_wk,
+        })
+
+    return players_list
 
 
 @router.get("/players/search")
