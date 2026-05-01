@@ -554,30 +554,35 @@ class StartMatchRequest(BaseModel):
     max_overs: int
 
 
-@router.post("/{match_id}/start")  
+@router.post("/{match_id}/start")
 def start_match(
         match_id: str,
         payload: StartMatchRequest,
         db: Session = Depends(get_db),
         user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Fetch the match
     match = db.query(models.Match).filter(models.Match.id == match_id).first()
 
     if not match:
         raise HTTPException(404, "Match not found")
 
-    # This fixes your 403 error: Ensure the person starting is the admin
-    if match.admin_id != user_id:
-        raise HTTPException(403, "Not allowed")
+    # 2. 🔥 FIXED: Use tournament-level permission check
+    # This replaces: if match.admin_id != user_id:
+    # This allows any tournament ADMIN to start the match.
+    require_admin(db, user_id, match.tournament_id)
 
-    # 1. Clear old data (useful for resets)
+    # 3. Clear old data (useful for resets)
     db.query(models.Batsman).filter(models.Batsman.match_id == match_id).delete()
     db.query(models.Ball).filter(models.Ball.match_id == match_id).delete()
     db.query(models.Bowler).filter(models.Bowler.match_id == match_id).delete()
 
-    # 2. Setup Openers
+    # 4. Setup Openers (Note: Use .get() or .filter().first() for safety)
     striker_p = db.query(models.Player).get(payload.striker_id)
     non_striker_p = db.query(models.Player).get(payload.non_striker_id)
+
+    if not striker_p or not non_striker_p:
+        raise HTTPException(400, "One or more batsmen not found")
 
     db.add(models.Batsman(
         match_id=match_id,
@@ -592,20 +597,76 @@ def start_match(
         is_striker=False
     ))
 
-    # 3. Setup Opening Bowler
+    # 5. Setup Opening Bowler
     bowler_p = db.query(models.Player).get(payload.bowler_id)
+    if not bowler_p:
+        raise HTTPException(400, "Bowler not found")
+
     db.add(models.Bowler(
         match_id=match_id,
         player_id=bowler_p.id,
         name=bowler_p.name
     ))
 
-    # 4. Update Match Status
+    # 6. Update Match Status
     match.status = "live"
     match.total_overs = payload.max_overs
 
     db.commit()
     return {"message": "Match started successfully"}
+
+# @router.post("/{match_id}/start")
+# def start_match(
+#         match_id: str,
+#         payload: StartMatchRequest,
+#         db: Session = Depends(get_db),
+#         user_id: str = Depends(get_current_user_id)
+# ):
+#     match = db.query(models.Match).filter(models.Match.id == match_id).first()
+#
+#     if not match:
+#         raise HTTPException(404, "Match not found")
+#
+#     # This fixes your 403 error: Ensure the person starting is the admin
+#     if match.admin_id != user_id:
+#         raise HTTPException(403, "Not allowed")
+#
+#     # 1. Clear old data (useful for resets)
+#     db.query(models.Batsman).filter(models.Batsman.match_id == match_id).delete()
+#     db.query(models.Ball).filter(models.Ball.match_id == match_id).delete()
+#     db.query(models.Bowler).filter(models.Bowler.match_id == match_id).delete()
+#
+#     # 2. Setup Openers
+#     striker_p = db.query(models.Player).get(payload.striker_id)
+#     non_striker_p = db.query(models.Player).get(payload.non_striker_id)
+#
+#     db.add(models.Batsman(
+#         match_id=match_id,
+#         player_id=striker_p.id,
+#         name=striker_p.name,
+#         is_striker=True
+#     ))
+#     db.add(models.Batsman(
+#         match_id=match_id,
+#         player_id=non_striker_p.id,
+#         name=non_striker_p.name,
+#         is_striker=False
+#     ))
+#
+#     # 3. Setup Opening Bowler
+#     bowler_p = db.query(models.Player).get(payload.bowler_id)
+#     db.add(models.Bowler(
+#         match_id=match_id,
+#         player_id=bowler_p.id,
+#         name=bowler_p.name
+#     ))
+#
+#     # 4. Update Match Status
+#     match.status = "live"
+#     match.total_overs = payload.max_overs
+#
+#     db.commit()
+#     return {"message": "Match started successfully"}
 
 
 # from fastapi import APIRouter, Depends, HTTPException
