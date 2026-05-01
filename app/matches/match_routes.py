@@ -567,17 +567,15 @@ def start_match(
     if not match:
         raise HTTPException(404, "Match not found")
 
-    # 2. 🔥 FIXED: Use tournament-level permission check
-    # This replaces: if match.admin_id != user_id:
-    # This allows any tournament ADMIN to start the match.
+    # 2. Permission Check
     require_admin(db, user_id, match.tournament_id)
 
-    # 3. Clear old data (useful for resets)
+    # 3. Clear old data for this match (Reset logic)
     db.query(models.Batsman).filter(models.Batsman.match_id == match_id).delete()
     db.query(models.Ball).filter(models.Ball.match_id == match_id).delete()
     db.query(models.Bowler).filter(models.Bowler.match_id == match_id).delete()
 
-    # 4. Setup Openers (Note: Use .get() or .filter().first() for safety)
+    # 4. Setup Openers
     striker_p = db.query(models.Player).get(payload.striker_id)
     non_striker_p = db.query(models.Player).get(payload.non_striker_id)
 
@@ -597,15 +595,19 @@ def start_match(
         is_striker=False
     ))
 
-    # 5. Setup Opening Bowler
+    # 5. Setup Opening Bowler (FIXED 🔥)
     bowler_p = db.query(models.Player).get(payload.bowler_id)
     if not bowler_p:
         raise HTTPException(400, "Bowler not found")
 
     db.add(models.Bowler(
+        id=bowler_p.id,        # Changed from player_id to id to match your model
         match_id=match_id,
-        player_id=bowler_p.id,
-        name=bowler_p.name
+        name=bowler_p.name,
+        overs="0.0",           # Initialize as string "0.0"
+        runs=0,
+        wickets=0,
+        economy=0.0
     ))
 
     # 6. Update Match Status
