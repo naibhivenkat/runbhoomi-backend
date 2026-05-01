@@ -7,6 +7,7 @@ from app.auth.deps import get_current_user_id
 from app.database import models
 from app.database.db import get_db
 from app.database.models import TournamentMatch
+from app.utls.match_model import BallInput
 from app.utls.permissions import require_admin
 
 router = APIRouter(prefix="/matches")
@@ -178,6 +179,151 @@ def set_playing_xi(
 #             result.append({"id": player.id, "name": player.name})
 #     return result
 
+
+
+
+
+@router.post("/{match_id}/ball")
+def add_ball(
+    match_id: str,
+    payload: BallInput,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
+):
+    match = db.query(models.Match).get(match_id)
+
+    if not match:
+        raise HTTPException(404, "Match not found")
+
+    if match.admin_id != user_id:
+        raise HTTPException(403, "Not allowed")
+
+    runs = payload.runs or 0
+    wicket = payload.wicket
+    extra_type = payload.extra_type
+    next_batsman_id = payload.next_batsman_id
+
+    # =========================
+    # EXTRA HANDLING (FIXED 🔥)
+    # =========================
+    is_extra = extra_type in ["wide", "no_ball"]
+
+    # Force 1 run for extras
+    extra_runs = 1 if is_extra else 0
+
+    # =========================
+    # LAST BALL
+    # =========================
+    last_ball = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).order_by(models.Ball.id.desc()).first()
+
+    over, ball_num = 0, 1
+
+    if last_ball:
+        over = last_ball.over
+        ball_num = last_ball.ball
+
+        if not is_extra:
+            ball_num += 1
+            if ball_num > 6:
+                over += 1
+                ball_num = 1
+
+    # =========================
+    # BATSMEN
+    # =========================
+    batsmen = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id,
+        models.Batsman.is_out == False
+    ).all()
+
+    if len(batsmen) < 2:
+        raise HTTPException(400, "Need 2 batsmen")
+
+    striker = next(b for b in batsmen if b.is_striker)
+    non_striker = next(b for b in batsmen if not b.is_striker)
+
+    # =========================
+    # SAVE BALL
+    # =========================
+    new_ball = models.Ball(
+        match_id=match_id,
+        innings=match.current_innings,
+        over=over,
+        ball=ball_num,
+
+        batsman_id=striker.player_id,
+        non_striker_id=non_striker.player_id,
+
+        runs=runs,
+        extra_type=extra_type,
+        extra_runs=extra_runs,
+
+        is_wicket=wicket,
+        player_out_id=striker.player_id if wicket else None,
+
+        is_legal_ball=not is_extra
+    )
+
+    db.add(new_ball)
+
+    # =========================
+    # UPDATE BATSMAN STATS
+    # =========================
+    # Ball faced only for legal delivery
+    if not is_extra:
+        striker.balls += 1
+
+    # Runs always add (even on no-ball)
+    striker.runs += runs
+
+    if runs == 4:
+        striker.fours += 1
+    elif runs == 6:
+        striker.sixes += 1
+
+    # =========================
+    # WICKET
+    # =========================
+    if wicket:
+        striker.is_out = True
+        striker.is_striker = False
+
+        if not next_batsman_id:
+            db.commit()
+            return {"need_next_batsman": True}
+
+        player = db.query(models.Player).get(next_batsman_id)
+
+        new_batsman = models.Batsman(
+            match_id=match_id,
+            player_id=player.id,
+            name=player.name,
+            is_striker=True
+        )
+        db.add(new_batsman)
+
+    else:
+        # 🔥 STRIKE ROTATION (ONLY ON LEGAL BALLS)
+        if not is_extra and runs % 2 == 1:
+            striker.is_striker = False
+            non_striker.is_striker = True
+
+    # =========================
+    # OVER COMPLETE (FIXED)
+    # =========================
+    if not is_extra and ball_num == 6:
+        striker.is_striker = not striker.is_striker
+        non_striker.is_striker = not non_striker.is_striker
+
+    db.commit()
+
+    return {
+        "message": "Ball added",
+        "runs_added": runs + extra_runs,
+        "is_extra": is_extra
+    }
 
 
 @router.get("/teams/{team_id}/players")
@@ -701,7 +847,7 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 #         "runs_added": runs + extra_runs,
 #         "is_extra": is_extra
 #     }
-#
+
 #
 # @router.post("/{match_id}/reset")
 # def reset_match(match_id: int, db: Session = Depends(get_db)):
