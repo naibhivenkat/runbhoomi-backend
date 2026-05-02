@@ -550,27 +550,33 @@ def generate_knockouts(tournament_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{tournament_id}/fixtures/upcoming")
 def delete_upcoming_fixtures(
-    tournament_id: str,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id) # 🔥 This enforces authentication
+        tournament_id: str,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Verify that the user is actually an admin of this tournament
     require_admin(db, user_id, tournament_id)
 
-    # 2. Delete fixtures that haven't started (match_id is null)
-    # and haven't finished (winner is null)
-    deleted = db.query(models.TournamentMatch).filter(
+    # 1. Find all fixture matches for this tournament that haven't finished
+    fixtures = db.query(models.TournamentMatch).filter(
         models.TournamentMatch.tournament_id == tournament_id,
-        models.TournamentMatch.match_id == None,
+        models.TournamentMatch.winner == None
+    ).all()
+
+    # 2. For each fixture, if it has a linked match_id, we should also delete the scoring record
+    for f in fixtures:
+        if f.match_id:
+            # Optional: Delete actual scoring data if you want a TOTAL reset
+            db.query(models.Match).filter(models.Match.id == f.match_id).delete()
+            db.query(models.Ball).filter(models.Ball.match_id == f.match_id).delete()
+
+    # 3. Delete the fixtures themselves
+    deleted_count = db.query(models.TournamentMatch).filter(
+        models.TournamentMatch.tournament_id == tournament_id,
         models.TournamentMatch.winner == None
     ).delete(synchronize_session=False)
 
     db.commit()
-
-    return {
-        "message": "Upcoming fixtures deleted",
-        "deleted": deleted
-    }
+    return {"message": "Reset complete", "deleted": deleted_count}
 
 
 @router.get("/{tournament_id}/teams")
@@ -1263,6 +1269,7 @@ def update_player_details(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.patch("/teams/{team_id}/players/{player_id}/role")
 def update_player_role(
