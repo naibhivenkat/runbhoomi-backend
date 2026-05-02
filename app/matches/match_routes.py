@@ -679,7 +679,7 @@ def start_match(
     for p_id, striker_flag in [(payload.striker_id, True), (payload.non_striker_id, False)]:
         player = db.query(models.Player).get(p_id)
         if player:
-            db.add(models.Batsman(match_id=match_id, player_id=player.id, name=player.name, is_striker=striker_flag))
+            db.add(models.Batsman(match_id=match_id, player_id=player.id, name=player.name, is_striker=striker_flag,  is_out=False))
 
     # 5. Setup Opening Bowler
     bowler_p = db.query(models.Player).get(payload.bowler_id)
@@ -716,7 +716,7 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 
 
 @router.get("/{match_id}/live")
-def get_live_score(match_id: int, db: Session = Depends(get_db)):
+def get_live_score(match_id: str, db: Session = Depends(get_db)):
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
     ).order_by(models.Ball.id.asc()).all()
