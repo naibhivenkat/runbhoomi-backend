@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from app.auth.deps import get_current_user_id
 from app.database import models
 from app.database.db import get_db
-from app.database.models import TournamentMatch
+from app.database.models import TournamentMatch, generate_uuid
 from app.utls.match_model import BallInput
 from app.utls.permissions import require_admin
 
@@ -19,6 +19,13 @@ class AddPlayerRequest(BaseModel):
 class QuickAddPlayerRequest(BaseModel):
     name: str
     phone: str | None = None
+class StartMatchRequest(BaseModel):
+    striker_id: str
+    non_striker_id: str
+    bowler_id: str
+    toss_winner: str
+    toss_decision: str
+    max_overs: int
 
 
 @router.post("/create_match")
@@ -546,7 +553,7 @@ def get_my_cricket(
 #     ]
 
 
-@router.post("/{match_id}/start")
+@router.post("/{match_id}/start_match")
 def start_match(
         match_id: str,
         payload: StartMatchRequest,
@@ -640,13 +647,6 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 
 
 
-class StartMatchRequest(BaseModel):
-    striker_id: str
-    non_striker_id: str
-    bowler_id: str
-    toss_winner: str
-    toss_decision: str
-    max_overs: int
 
 
 # @router.post("/{match_id}/start")
