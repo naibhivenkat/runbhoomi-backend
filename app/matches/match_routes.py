@@ -180,7 +180,6 @@ def set_playing_xi(
     return {"message": "Playing XI set"}
 
 
-
 @router.post("/{match_id}/ball")
 def add_ball(
         match_id: str,
@@ -188,13 +187,21 @@ def add_ball(
         db: Session = Depends(get_db),
         user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Fetch Match
-    match = db.query(models.Match).filter(
-        models.Match.id == match_id
-    ).first()
+    # 1. Resolve ID: Check if match_id is actually a Fixture ID
+    match = db.query(models.Match).filter(models.Match.id == match_id).first()
+
+    if not match:
+        # Try to find match via fixture link
+        fixture = db.query(models.TournamentMatch).filter(models.TournamentMatch.id == match_id).first()
+        if fixture and fixture.match_id:
+            match = db.query(models.Match).filter(models.Match.id == fixture.match_id).first()
+
     if not match:
         logging.error(f"❌ MATCH NOT FOUND: {match_id}")
         raise HTTPException(404, "Match not found")
+
+    # Use the REAL match internal ID for the rest of the function
+    match_id = match.id
 
     # 2. Permission Check (Fixes your 403 error)
     # Using your require_admin utility to check Tournament-level permissions
