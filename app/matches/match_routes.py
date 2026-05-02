@@ -530,15 +530,37 @@ def get_my_cricket(
     }
 
 
+
+# TODO :
+
+# @router.get("/tournament/{tournament_id}")
+# def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db)):
+#     matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
+#     return [
+#         {
+#             "team_a": m.team_a, "team_b": m.team_b,
+#             "team_a_id": m.team_a_id, "team_b_id": m.team_b_id,
+#             "group": m.group_id, "date": m.match_date,
+#             "result": f"{m.winner} won" if m.winner else None
+#         } for m in matches
+#     ]
+
+
+
 @router.get("/tournament/{tournament_id}")
 def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db)):
     matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
     return [
         {
-            "team_a": m.team_a, "team_b": m.team_b,
-            "team_a_id": m.team_a_id, "team_b_id": m.team_b_id,
-            "group": m.group_id, "date": m.match_date,
-            "result": f"{m.winner} won" if m.winner else None
+            "id": m.id, # Fixture ID
+            "match_id": m.match_id,
+            "team_a": m.team_a,
+            "team_b": m.team_b,
+            "team_a_id": m.team_a_id,
+            "team_b_id": m.team_b_id,
+            "group_id": m.group_id,
+            "winner": m.winner,
+            "is_live": True if m.match_id else False
         } for m in matches
     ]
 
