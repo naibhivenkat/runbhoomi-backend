@@ -111,6 +111,8 @@ def get_matches(email: str, db: Session = Depends(get_db)):
             "note": note,
         })
 
+
+
     return result
 
 
@@ -713,6 +715,101 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 
 
 
+@router.get("/{match_id}/live")
+def get_live_score(match_id: int, db: Session = Depends(get_db)):
+    balls = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).order_by(models.Ball.id.asc()).all()
+
+    total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+    wickets = sum(1 for b in balls if b.is_wicket)
+
+    legal_balls = sum(1 for b in balls if b.is_legal_ball)
+
+    overs = f"{legal_balls // 6}.{legal_balls % 6}"
+    score = f"{total_runs}/{wickets}"
+
+    # =========================
+    # LAST OVER (FIXED 🔥)
+    # =========================
+    last_over = []
+    for b in balls[-6:]:
+        if b.is_wicket:
+            last_over.append("W")
+        elif b.extra_type == "wide":
+            last_over.append("WD")
+        elif b.extra_type == "no_ball":
+            last_over.append("NB")
+        else:
+            last_over.append(str(b.runs or 0))
+
+    # =========================
+    # BATSMEN
+    # =========================
+    batsmen = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id,
+        models.Batsman.is_out == False
+    ).all()
+
+    batsmen_data = []
+    for b in batsmen:
+        batsmen_data.append({
+            "name": b.name,
+            "runs": b.runs,
+            "balls": b.balls,
+            "is_striker": b.is_striker
+        })
+
+    # =========================
+    # EXTRAS
+    # =========================
+    total_extras = sum(b.extra_runs for b in balls)
+
+    # =========================
+    # CURRENT BOWLER (ADD THIS)
+    # =========================
+    bowler = db.query(models.Bowler).filter(
+        models.Bowler.match_id == match_id
+    ).order_by(models.Bowler.id.desc()).first()
+
+    bowler_data = None
+    if bowler:
+        bowler_data = {
+            "id": bowler.id,
+            "name": bowler.name,
+            "overs": bowler.overs,
+            "runs": bowler.runs,
+            "wickets": bowler.wickets,
+            "economy": bowler.economy
+        }
+    print("LIVE API HIT:", match_id)
+    # =========================
+    # FINAL RESPONSE (REPLACE YOUR RETURN)
+    # =========================
+    return {
+        "score": score,
+        "overs": overs,
+        "batsmen": [
+            {
+                "id": b.player_id,  # 🔥 IMPORTANT (ADD THIS)
+                "name": b.name,
+                "runs": b.runs,
+                "balls": b.balls,
+                "fours": b.fours,
+                "sixes": b.sixes,
+                "is_striker": b.is_striker
+            }
+            for b in batsmen
+        ],
+        "current_bowler": bowler_data,  # 🔥 IMPORTANT
+        "last_over": last_over,
+        "extras": total_extras
+    }
+
+
+
+
+
 # @router.post("/{match_id}/start")
 # def start_match(
 #         match_id: str,
@@ -1114,7 +1211,7 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 #         "last_over": last_over,
 #         "extras": total_extras
 #     }
-#
+
 #
 #
 # @router.post("/{match_id}/add_ball")
