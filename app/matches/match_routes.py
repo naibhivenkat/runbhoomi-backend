@@ -193,7 +193,7 @@ def add_ball(
         models.Match.id == match_id
     ).first()
     if not match:
-        logging.INFO("❌ MATCH NOT FOUND:", match_id)
+        logging.error(f"❌ MATCH NOT FOUND: {match_id}")
         raise HTTPException(404, "Match not found")
 
     # 2. Permission Check (Fixes your 403 error)
