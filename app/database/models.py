@@ -130,8 +130,10 @@ class Match(Base):
     playing_xi = relationship("PlayingXI", back_populates="match")
     admin_id = Column(String, ForeignKey("players.id"))
     tournament_id = Column(String, ForeignKey("tournaments.id"))
+
     batsmen = relationship("Batsman", back_populates="match", cascade="all, delete-orphan")
     balls = relationship("Ball", back_populates="match", cascade="all, delete-orphan")
+    bowlers = relationship("Bowler", back_populates="match", cascade="all, delete-orphan")
 
 
 # =========================
@@ -170,6 +172,8 @@ class Batsman(Base):
 
     is_striker = Column(Boolean, default=False)
     is_out = Column(Boolean, default=False)
+
+    match = relationship("Match", back_populates="batsmen")
 
 
 # =========================
@@ -218,6 +222,8 @@ class Ball(Base):
     is_legal_ball = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    match = relationship("Match", back_populates="balls")
 
 
 # =========================
