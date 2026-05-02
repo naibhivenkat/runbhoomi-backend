@@ -549,19 +549,28 @@ def generate_knockouts(tournament_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{tournament_id}/fixtures/upcoming")
-def delete_upcoming_fixtures(tournament_id: str, db: Session = Depends(get_db),
-                             user_id: str = Depends(get_current_user_id)):
-    # Verify Admin
+def delete_upcoming_fixtures(
+    tournament_id: str,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id) # 🔥 This enforces authentication
+):
+    # 1. Verify that the user is actually an admin of this tournament
     require_admin(db, user_id, tournament_id)
 
-    # Delete fixtures that haven't resulted in a winner
+    # 2. Delete fixtures that haven't started (match_id is null)
+    # and haven't finished (winner is null)
     deleted = db.query(models.TournamentMatch).filter(
         models.TournamentMatch.tournament_id == tournament_id,
+        models.TournamentMatch.match_id == None,
         models.TournamentMatch.winner == None
-    ).delete()
+    ).delete(synchronize_session=False)
 
     db.commit()
-    return {"message": "Fixtures cleared", "deleted": deleted}
+
+    return {
+        "message": "Upcoming fixtures deleted",
+        "deleted": deleted
+    }
 
 
 @router.get("/{tournament_id}/teams")
