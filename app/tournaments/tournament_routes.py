@@ -549,19 +549,19 @@ def generate_knockouts(tournament_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{tournament_id}/fixtures/upcoming")
-def delete_upcoming_fixtures(tournament_id: str, db: Session = Depends(get_db)):
-    deleted = db.query(TournamentMatch).filter(
-        TournamentMatch.tournament_id == tournament_id,
-        TournamentMatch.match_id == None,
-        TournamentMatch.winner == None
-    ).delete(synchronize_session=False)
+def delete_upcoming_fixtures(tournament_id: str, db: Session = Depends(get_db),
+                             user_id: str = Depends(get_current_user_id)):
+    # Verify Admin
+    require_admin(db, user_id, tournament_id)
+
+    # Delete fixtures that haven't resulted in a winner
+    deleted = db.query(models.TournamentMatch).filter(
+        models.TournamentMatch.tournament_id == tournament_id,
+        models.TournamentMatch.winner == None
+    ).delete()
 
     db.commit()
-
-    return {
-        "message": "Upcoming fixtures deleted",
-        "deleted": deleted
-    }
+    return {"message": "Fixtures cleared", "deleted": deleted}
 
 
 @router.get("/{tournament_id}/teams")
