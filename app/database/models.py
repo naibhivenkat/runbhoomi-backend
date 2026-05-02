@@ -130,6 +130,8 @@ class Match(Base):
     playing_xi = relationship("PlayingXI", back_populates="match")
     admin_id = Column(String, ForeignKey("players.id"))
     tournament_id = Column(String, ForeignKey("tournaments.id"))
+    batsmen = relationship("Batsman", back_populates="match", cascade="all, delete-orphan")
+    balls = relationship("Ball", back_populates="match", cascade="all, delete-orphan")
 
 
 # =========================

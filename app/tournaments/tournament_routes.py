@@ -554,30 +554,38 @@ def delete_upcoming_fixtures(
         db: Session = Depends(get_db),
         user_id: str = Depends(get_current_user_id)
 ):
+    # 1. Authorization
     require_admin(db, user_id, tournament_id)
 
-    # 1. Find all fixture matches for this tournament that haven't finished
+    # 2. Identify fixtures to be reset (where there is no winner yet)
     fixtures = db.query(models.TournamentMatch).filter(
         models.TournamentMatch.tournament_id == tournament_id,
         models.TournamentMatch.winner == None
     ).all()
 
-    # 2. For each fixture, if it has a linked match_id, we should also delete the scoring record
     for f in fixtures:
         if f.match_id:
-            # Optional: Delete actual scoring data if you want a TOTAL reset
-            db.query(models.Match).filter(models.Match.id == f.match_id).delete()
+            # 🔥 CRITICAL FIX: Delete child records BEFORE deleting the Match
+            # Order matters: Delete Balls -> Batsmen/Bowlers -> Match
             db.query(models.Ball).filter(models.Ball.match_id == f.match_id).delete()
+            db.query(models.Batsman).filter(models.Batsman.match_id == f.match_id).delete()
+            db.query(models.Bowler).filter(models.Bowler.match_id == f.match_id).delete()
 
-    # 3. Delete the fixtures themselves
+            # Now safe to delete the main match scoring record
+            db.query(models.Match).filter(models.Match.id == f.match_id).delete()
+
+    # 3. Finally, delete the fixtures (TournamentMatch entries)
     deleted_count = db.query(models.TournamentMatch).filter(
         models.TournamentMatch.tournament_id == tournament_id,
         models.TournamentMatch.winner == None
     ).delete(synchronize_session=False)
 
     db.commit()
-    return {"message": "Reset complete", "deleted": deleted_count}
 
+    return {
+        "message": "Reset successful. All pending matches and scoring data cleared.",
+        "deleted_fixtures": deleted_count
+    }
 
 @router.get("/{tournament_id}/teams")
 def get_teams(tournament_id: str, db: Session = Depends(get_db)):
