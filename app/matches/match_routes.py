@@ -553,79 +553,143 @@ def get_my_cricket(
 #     ]
 
 
-@router.post("/{match_id}/start_match")
+# @router.post("/{match_id}/start_match")
+# def start_match(
+#         match_id: str,
+#         payload: StartMatchRequest,
+#         db: Session = Depends(get_db),
+#         user_id: str = Depends(get_current_user_id)
+# ):
+#     # 1. Fetch the match
+#     match = db.query(models.Match).filter(models.Match.id == match_id).first()
+#     if not match:
+#         raise HTTPException(404, "Match not found")
+#
+#     # 2. Permission Check
+#     require_admin(db, user_id, match.tournament_id)
+#
+#     # 3. Clear old data for this match (Reset logic)
+#     db.query(models.Batsman).filter(models.Batsman.match_id == match_id).delete()
+#     db.query(models.Ball).filter(models.Ball.match_id == match_id).delete()
+#     db.query(models.Bowler).filter(models.Bowler.match_id == match_id).delete()
+#
+#     # 4. Setup Openers
+#     striker_p = db.query(models.Player).get(payload.striker_id)
+#     non_striker_p = db.query(models.Player).get(payload.non_striker_id)
+#
+#     if not striker_p or not non_striker_p:
+#         raise HTTPException(400, "One or more batsmen not found")
+#
+#     db.add(models.Batsman(
+#         match_id=match_id,
+#         player_id=striker_p.id,
+#         name=striker_p.name,
+#         is_striker=True
+#     ))
+#     db.add(models.Batsman(
+#         match_id=match_id,
+#         player_id=non_striker_p.id,
+#         name=non_striker_p.name,
+#         is_striker=False
+#     ))
+#
+#     # 5. Setup Opening Bowler
+#     bowler_p = db.query(models.Player).get(payload.bowler_id)
+#     if not bowler_p:
+#         raise HTTPException(400, "Bowler not found")
+#
+#     db.add(models.Bowler(
+#         id=generate_uuid(),  # Use generate_uuid() for new record ID
+#         match_id=match_id,
+#         name=bowler_p.name,
+#         overs="0.0",
+#         runs=0,
+#         wickets=0,
+#         economy=0.0
+#     ))
+#
+#     # 6. Update Match Status
+#     match.status = "live"
+#     match.total_overs = payload.max_overs
+#
+#     # 🔥 CRITICAL FIX: Link the TournamentMatch fixture to this live Match
+#     # This ensures the tournament list knows the match is now LIVE
+#     fixture = db.query(models.TournamentMatch).filter(
+#         models.TournamentMatch.match_id == match_id
+#     ).first()
+#
+#     if fixture:
+#         fixture.match_id = match_id  # Redundant check but ensures link exists
+#         # If your TournamentMatch model has an 'is_live' or status field, update it here
+#
+#     db.commit()
+#     return {"message": "Match started successfully", "match_id": match_id}
+#
+
+@router.post("/{fixture_or_match_id}/start_match")
 def start_match(
-        match_id: str,
+        fixture_or_match_id: str,
         payload: StartMatchRequest,
         db: Session = Depends(get_db),
         user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Fetch the match
-    match = db.query(models.Match).filter(models.Match.id == match_id).first()
-    if not match:
-        raise HTTPException(404, "Match not found")
+    # 1. Try to find if this is a Tournament Fixture first
+    fixture = db.query(models.TournamentMatch).filter(models.TournamentMatch.id == fixture_or_match_id).first()
 
-    # 2. Permission Check
-    require_admin(db, user_id, match.tournament_id)
+    match_id = None
 
-    # 3. Clear old data for this match (Reset logic)
+    if fixture:
+        # If the fixture already has a match_id, use it.
+        # Otherwise, CREATE a new Match record for this fixture.
+        if fixture.match_id:
+            match_id = fixture.match_id
+        else:
+            new_match = models.Match(
+                team_a_id=fixture.team_a_id,
+                team_b_id=fixture.team_b_id,
+                total_overs=payload.max_overs,
+                status="live",
+                tournament_id=fixture.tournament_id,
+                admin_id=user_id
+            )
+            db.add(new_match)
+            db.flush()  # 🔥 Generates the ID immediately
+            match_id = new_match.id
+            fixture.match_id = match_id  # Link fixture to match
+    else:
+        # If not a fixture, assume it's a direct Match ID
+        match = db.query(models.Match).filter(models.Match.id == fixture_or_match_id).first()
+        if not match:
+            raise HTTPException(404, "Match or Fixture not found")
+        match_id = match.id
+
+    # 2. Permission Check using the resolved match context
+    # (Assuming you fetch the match object to get tournament_id)
+    target_match = db.query(models.Match).get(match_id)
+    require_admin(db, user_id, target_match.tournament_id)
+
+    # 3. Clear existing setup data (Reset for re-starts)
     db.query(models.Batsman).filter(models.Batsman.match_id == match_id).delete()
     db.query(models.Ball).filter(models.Ball.match_id == match_id).delete()
     db.query(models.Bowler).filter(models.Bowler.match_id == match_id).delete()
 
     # 4. Setup Openers
-    striker_p = db.query(models.Player).get(payload.striker_id)
-    non_striker_p = db.query(models.Player).get(payload.non_striker_id)
-
-    if not striker_p or not non_striker_p:
-        raise HTTPException(400, "One or more batsmen not found")
-
-    db.add(models.Batsman(
-        match_id=match_id,
-        player_id=striker_p.id,
-        name=striker_p.name,
-        is_striker=True
-    ))
-    db.add(models.Batsman(
-        match_id=match_id,
-        player_id=non_striker_p.id,
-        name=non_striker_p.name,
-        is_striker=False
-    ))
+    for p_id, striker_flag in [(payload.striker_id, True), (payload.non_striker_id, False)]:
+        player = db.query(models.Player).get(p_id)
+        if player:
+            db.add(models.Batsman(match_id=match_id, player_id=player.id, name=player.name, is_striker=striker_flag))
 
     # 5. Setup Opening Bowler
     bowler_p = db.query(models.Player).get(payload.bowler_id)
-    if not bowler_p:
-        raise HTTPException(400, "Bowler not found")
+    if bowler_p:
+        db.add(models.Bowler(id=generate_uuid(), match_id=match_id, name=bowler_p.name, overs="0.0"))
 
-    db.add(models.Bowler(
-        id=generate_uuid(),  # Use generate_uuid() for new record ID
-        match_id=match_id,
-        name=bowler_p.name,
-        overs="0.0",
-        runs=0,
-        wickets=0,
-        economy=0.0
-    ))
-
-    # 6. Update Match Status
-    match.status = "live"
-    match.total_overs = payload.max_overs
-
-    # 🔥 CRITICAL FIX: Link the TournamentMatch fixture to this live Match
-    # This ensures the tournament list knows the match is now LIVE
-    fixture = db.query(models.TournamentMatch).filter(
-        models.TournamentMatch.match_id == match_id
-    ).first()
-
-    if fixture:
-        fixture.match_id = match_id  # Redundant check but ensures link exists
-        # If your TournamentMatch model has an 'is_live' or status field, update it here
+    # 6. Finalize Status
+    target_match.status = "live"
+    target_match.total_overs = payload.max_overs
 
     db.commit()
     return {"message": "Match started successfully", "match_id": match_id}
-
-
 
 @router.get("/tournament/{tournament_id}")
 def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db)):
