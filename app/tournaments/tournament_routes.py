@@ -351,110 +351,200 @@ def get_tournaments(db: Session = Depends(get_db)):
     ]
 
 
+# @router.post("/{tournament_id}/generate_fixtures")
+# def generate_fixtures(
+#         tournament_id: str,
+#         group_count: int = Query(2),
+#         start_time: str = Query("08:00"),
+#         gap: int = Query(10),
+#         db: Session = Depends(get_db),
+#         user_id: str = Depends(get_current_user_id)  # 🔥 ADD
+# ):
+#     # 🔐 ADMIN CHECK (MOST IMPORTANT)
+#     require_admin(db, user_id, tournament_id)
+#
+#     tournament = db.query(models.Tournament).get(tournament_id)
+#
+#     if not tournament:
+#         raise HTTPException(404, "Tournament not found")
+#
+#     teams = db.query(TournamentTeam).filter_by(
+#         tournament_id=tournament_id,
+#         status="approved"
+#     ).all()
+#
+#     if len(teams) < 2:
+#         raise HTTPException(400, "Not enough teams")
+#
+#     # DELETE OLD
+#     db.query(TournamentMatch).filter(
+#         TournamentMatch.tournament_id == tournament_id
+#     ).delete(synchronize_session=False)
+#
+#     old_groups = db.query(TournamentGroup).filter(
+#         TournamentGroup.tournament_id == tournament_id
+#     ).all()
+#
+#     group_ids = [g.id for g in old_groups]
+#
+#     if group_ids:
+#         db.query(GroupTeam).filter(
+#             GroupTeam.group_id.in_(group_ids)
+#         ).delete(synchronize_session=False)
+#
+#     db.query(TournamentGroup).filter(
+#         TournamentGroup.tournament_id == tournament_id
+#     ).delete(synchronize_session=False)
+#
+#     db.commit()
+#
+#     ids = [t.team_id for t in teams]
+#
+#     matches_created = []
+#
+#     if tournament.format in ["league", "hybrid"]:
+#
+#         groups = create_groups(db, tournament_id, teams, group_count)
+#
+#         for g in groups:
+#             group_teams = db.query(GroupTeam).filter_by(group_id=g.id).all()
+#             team_ids = [gt.team_id for gt in group_teams]
+#
+#             fixtures = paired_rounds(team_ids)
+#
+#             for a, b in fixtures:
+#                 m = TournamentMatch(
+#                     tournament_id=tournament_id,
+#                     team_a_id=a,
+#                     team_b_id=b,
+#                     team_a=db.query(Team).get(a).name,
+#                     team_b=db.query(Team).get(b).name,
+#                     match_type="league",
+#                     group_id=g.id,
+#                     round=1
+#                 )
+#                 db.add(m)
+#                 matches_created.append(m)
+#
+#     db.commit()
+#
+#     matches = db.query(TournamentMatch).filter_by(
+#         tournament_id=tournament_id
+#     ).order_by(cast(TournamentMatch.match_time, Time)).all()
+#
+#     duration = get_match_duration(tournament.overs)
+#     current_time = datetime.strptime(start_time, "%H:%M")
+#
+#     grouped = {}
+#     for m in matches:
+#         grouped.setdefault(m.group_id, []).append(m)
+#
+#     order = []
+#     max_len = max(len(v) for v in grouped.values())
+#
+#     for i in range(max_len):
+#         for g in grouped:
+#             if i < len(grouped[g]):
+#                 order.append(grouped[g][i])
+#
+#     for m in order:
+#         m.match_time = current_time.strftime("%H:%M")
+#         current_time += timedelta(minutes=duration + gap)
+#
+#     db.commit()
+#
+#     return {"message": "Fixtures created with schedule"}
+
 @router.post("/{tournament_id}/generate_fixtures")
 def generate_fixtures(
         tournament_id: str,
-        group_count: int = Query(2),
+        group_count: int = Query(1),
         start_time: str = Query("08:00"),
         gap: int = Query(10),
+        is_double_round: bool = Query(False),  # 🔥 ADD THIS PARAMETER
         db: Session = Depends(get_db),
-        user_id: str = Depends(get_current_user_id)  # 🔥 ADD
+        user_id: str = Depends(get_current_user_id)
 ):
-    # 🔐 ADMIN CHECK (MOST IMPORTANT)
     require_admin(db, user_id, tournament_id)
-
     tournament = db.query(models.Tournament).get(tournament_id)
-
     if not tournament:
         raise HTTPException(404, "Tournament not found")
 
     teams = db.query(TournamentTeam).filter_by(
-        tournament_id=tournament_id,
-        status="approved"
+        tournament_id=tournament_id, status="approved"
     ).all()
 
     if len(teams) < 2:
-        raise HTTPException(400, "Not enough teams")
+        raise HTTPException(400, "Not enough approved teams")
 
-    # DELETE OLD
-    db.query(TournamentMatch).filter(
-        TournamentMatch.tournament_id == tournament_id
-    ).delete(synchronize_session=False)
-
-    old_groups = db.query(TournamentGroup).filter(
-        TournamentGroup.tournament_id == tournament_id
-    ).all()
-
+    # 1. CLEANUP (Matches, Groups, GroupTeams)
+    db.query(TournamentMatch).filter_by(tournament_id=tournament_id).delete()
+    old_groups = db.query(TournamentGroup).filter_by(tournament_id=tournament_id).all()
     group_ids = [g.id for g in old_groups]
-
     if group_ids:
-        db.query(GroupTeam).filter(
-            GroupTeam.group_id.in_(group_ids)
-        ).delete(synchronize_session=False)
-
-    db.query(TournamentGroup).filter(
-        TournamentGroup.tournament_id == tournament_id
-    ).delete(synchronize_session=False)
-
+        db.query(GroupTeam).filter(GroupTeam.group_id.in_(group_ids)).delete(synchronize_session=False)
+    db.query(TournamentGroup).filter_by(tournament_id=tournament_id).delete()
     db.commit()
 
-    ids = [t.team_id for t in teams]
-
-    matches_created = []
-
+    # 2. GENERATE FIXTURES
     if tournament.format in ["league", "hybrid"]:
-
         groups = create_groups(db, tournament_id, teams, group_count)
 
         for g in groups:
             group_teams = db.query(GroupTeam).filter_by(group_id=g.id).all()
             team_ids = [gt.team_id for gt in group_teams]
 
+            # Formula: Team A vs Team B
             fixtures = paired_rounds(team_ids)
 
-            for a, b in fixtures:
-                m = TournamentMatch(
+            def create_match_entry(a_id, b_id, round_num):
+                return TournamentMatch(
                     tournament_id=tournament_id,
-                    team_a_id=a,
-                    team_b_id=b,
-                    team_a=db.query(Team).get(a).name,
-                    team_b=db.query(Team).get(b).name,
+                    team_a_id=a_id,
+                    team_b_id=b_id,
+                    team_a=db.query(Team).get(a_id).name,
+                    team_b=db.query(Team).get(b_id).name,
                     match_type="league",
                     group_id=g.id,
-                    round=1
+                    round=round_num
                 )
-                db.add(m)
-                matches_created.append(m)
+
+            # First Round (A vs B)
+            for a, b in fixtures:
+                db.add(create_match_entry(a, b, 1))
+
+            # 🔥 DOUBLE ROUND ROBIN LOGIC: Second Round (B vs A)
+            if is_double_round:
+                for a, b in fixtures:
+                    # We swap a and b so Team B is now Team A (Home/Away logic)
+                    db.add(create_match_entry(b, a, 2))
 
     db.commit()
 
-    matches = db.query(TournamentMatch).filter_by(
-        tournament_id=tournament_id
-    ).order_by(cast(TournamentMatch.match_time, Time)).all()
-
+    # 3. SCHEDULING LOGIC (Same as before)
+    matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
     duration = get_match_duration(tournament.overs)
     current_time = datetime.strptime(start_time, "%H:%M")
 
+    # Interleave matches from different groups to keep schedule interesting
     grouped = {}
     for m in matches:
         grouped.setdefault(m.group_id, []).append(m)
 
     order = []
-    max_len = max(len(v) for v in grouped.values())
-
-    for i in range(max_len):
-        for g in grouped:
-            if i < len(grouped[g]):
-                order.append(grouped[g][i])
+    if grouped:
+        max_len = max(len(v) for v in grouped.values())
+        for i in range(max_len):
+            for g_id in grouped:
+                if i < len(grouped[g_id]):
+                    order.append(grouped[g_id][i])
 
     for m in order:
         m.match_time = current_time.strftime("%H:%M")
         current_time += timedelta(minutes=duration + gap)
 
     db.commit()
-
-    return {"message": "Fixtures created with schedule"}
-
+    return {"message": f"Fixtures created. Total matches: {len(order)}"}
 
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: str, db: Session = Depends(get_db)):
