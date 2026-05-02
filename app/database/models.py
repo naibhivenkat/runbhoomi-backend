@@ -192,6 +192,8 @@ class Bowler(Base):
     wickets = Column(Integer, default=0)
     economy = Column(Float, default=0)
 
+    match = relationship("Match", back_populates="bowlers")
+
 
 # =========================
 # ⚾ BALL (CORE ENGINE)
