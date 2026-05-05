@@ -701,15 +701,30 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/{match_id}/resume")
-def resume_match(match_id: str, db: Session = Depends(get_db)):
-    match = db.query(models.Match).filter(models.Match.id == match_id).first()
+@router.get("/{match_or_fixture_id}/resume")
+def resume_match(match_or_fixture_id: str, db: Session = Depends(get_db)):
+
+    # 1️⃣ Try direct match
+    match = db.query(models.Match).filter(
+        models.Match.id == match_or_fixture_id
+    ).first()
+
+    # 2️⃣ If not found → try fixture
+    if not match:
+        fixture = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.id == match_or_fixture_id
+        ).first()
+
+        if fixture and fixture.match_id:
+            match = db.query(models.Match).filter(
+                models.Match.id == fixture.match_id
+            ).first()
 
     if not match:
         raise HTTPException(404, "Match not found")
 
     balls = db.query(models.Ball).filter(
-        models.Ball.match_id == match_id
+        models.Ball.match_id == match.id
     ).order_by(models.Ball.id.asc()).all()
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
@@ -726,7 +741,6 @@ def resume_match(match_id: str, db: Session = Depends(get_db)):
         "balls_count": len(balls),
         "has_data": True if balls else False
     }
-
 
 @router.delete("/{match_id}/ball/last_ball_undo")
 def undo_last_ball(
