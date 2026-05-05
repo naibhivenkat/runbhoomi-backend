@@ -439,7 +439,6 @@ def start_match(
                 status="scheduled",
                 tournament_id=fixture.tournament_id,
                 admin_id=user_id,
-                innings=1
             )
             db.add(new_match)
             db.flush()
