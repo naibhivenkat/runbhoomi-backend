@@ -540,14 +540,12 @@ def start_match(
         db.add(models.Bowler(
             id=generate_uuid(),
             match_id=match_id,
-            player_id=bowler_p.id,
-            name=bowler_p.name,  # 🔥 ALWAYS STORE NAME
+            name=bowler_p.name,
             overs="0.0",
             runs=0,
             wickets=0,
             economy=0.0
         ))
-
     # -------------------------------
     # 8. Finalize Match
     # -------------------------------
@@ -564,6 +562,8 @@ def start_match(
         "match_id": match_id,
         "resume": False
     }
+
+
 # TODO :
 
 # @router.post("/{fixture_or_match_id}/start_match")
