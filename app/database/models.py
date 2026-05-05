@@ -134,6 +134,7 @@ class Match(Base):
     batsmen = relationship("Batsman", back_populates="match", cascade="all, delete-orphan")
     balls = relationship("Ball", back_populates="match", cascade="all, delete-orphan")
     bowlers = relationship("Bowler", back_populates="match", cascade="all, delete-orphan")
+    target = Column(Integer, nullable=True)
 
 
 

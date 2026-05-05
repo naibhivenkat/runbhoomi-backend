@@ -769,22 +769,31 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
     match = db.query(models.Match).filter(
         models.Match.id == match_id
     ).first()
+
+    if not match:
+        fixture = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.id == match_id
+        ).first()
+
+        if fixture and fixture.match_id:
+            match = db.query(models.Match).filter(
+                models.Match.id == fixture.match_id
+            ).first()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    # 🔥 IMPORTANT: use resolved match_id
+    match_id = match.id
     # =========================
     # FINAL RESPONSE
     # =========================
-    # return {
-    #     "score": score,
-    #     "overs": overs,
-    #     "batsmen": batsmen_data,
-    #     "bowler": bowler_data,
-    #     "last_over": last_over,
-    #     "extras": total_extras
-    # }
+
     return {
         "score": score,
         "overs": overs,
-        "target": match.target,
-        "innings": match.current_innings, 
+        "target": match.target or 0, 
+        "innings": match.current_innings or 1,
 
         "batsmen": batsmen_data,
         "bowler": bowler_data,
