@@ -761,17 +761,31 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
             "overs": bowler_overs,
             "runs": runs_conceded,
             "wickets": wickets_taken,
-            "economy": round(economy, 2)
+            "economy": economy
         }
 
-    print("LIVE API HIT:", match_id)
 
+    # get match
+    match = db.query(models.Match).filter(
+        models.Match.id == match_id
+    ).first()
     # =========================
     # FINAL RESPONSE
     # =========================
+    # return {
+    #     "score": score,
+    #     "overs": overs,
+    #     "batsmen": batsmen_data,
+    #     "bowler": bowler_data,
+    #     "last_over": last_over,
+    #     "extras": total_extras
+    # }
     return {
         "score": score,
         "overs": overs,
+        "target": match.target,
+        "innings": match.current_innings, 
+
         "batsmen": batsmen_data,
         "bowler": bowler_data,
         "last_over": last_over,
