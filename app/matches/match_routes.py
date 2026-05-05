@@ -253,6 +253,20 @@ def add_ball(
         raise HTTPException(400, "Could not identify striker/non-striker")
 
     # 6. Save Ball Record
+    # new_ball = models.Ball(
+    #     match_id=match_id,
+    #     innings=match.current_innings,
+    #     over=over,
+    #     ball=ball_num,
+    #     batsman_id=striker.player_id,
+    #     non_striker_id=non_striker.player_id,
+    #     runs=runs,
+    #     extra_type=extra_type,
+    #     extra_runs=extra_runs,
+    #     is_wicket=wicket,
+    #     player_out_id=striker.player_id if wicket else None,
+    #     is_legal_ball=not is_extra
+    # )
     new_ball = models.Ball(
         match_id=match_id,
         innings=match.current_innings,
@@ -260,6 +274,7 @@ def add_ball(
         ball=ball_num,
         batsman_id=striker.player_id,
         non_striker_id=non_striker.player_id,
+        bowler_id=payload.current_bowler_id,
         runs=runs,
         extra_type=extra_type,
         extra_runs=extra_runs,
@@ -654,6 +669,9 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 
 @router.get("/{match_id}/live")
 def get_live_score(match_id: str, db: Session = Depends(get_db)):
+    # =========================
+    # BALLS
+    # =========================
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
     ).order_by(models.Ball.id.asc()).all()
@@ -667,16 +685,16 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
     score = f"{total_runs}/{wickets}"
 
     # =========================
-    # LAST OVER (FIXED 🔥)
+    # LAST OVER
     # =========================
     last_over = []
     for b in balls[-6:]:
         if b.is_wicket:
             last_over.append("W")
         elif b.extra_type == "wide":
-            last_over.append("WD")
+            last_over.append("Wd")
         elif b.extra_type == "no_ball":
-            last_over.append("NB")
+            last_over.append("Nb")
         else:
             last_over.append(str(b.runs or 0))
 
@@ -688,14 +706,18 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
         models.Batsman.is_out == False
     ).all()
 
-    batsmen_data = []
-    for b in batsmen:
-        batsmen_data.append({
+    batsmen_data = [
+        {
+            "id": b.player_id,
             "name": b.name,
             "runs": b.runs,
             "balls": b.balls,
+            "fours": b.fours,
+            "sixes": b.sixes,
             "is_striker": b.is_striker
-        })
+        }
+        for b in batsmen
+    ]
 
     # =========================
     # EXTRAS
@@ -703,42 +725,55 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
     total_extras = sum(b.extra_runs for b in balls)
 
     # =========================
-    # CURRENT BOWLER (ADD THIS)
+    # ✅ CURRENT BOWLER (FIXED — FROM BALLS)
     # =========================
-    bowler = db.query(models.Bowler).filter(
-        models.Bowler.match_id == match_id
-    ).order_by(models.Bowler.id.desc()).first()
-
     bowler_data = None
-    if bowler:
+
+    # get latest ball
+    current_ball = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).order_by(models.Ball.id.desc()).first()
+
+    if current_ball and current_ball.bowler_id:
+
+        bowler_balls = db.query(models.Ball).filter(
+            models.Ball.match_id == match_id,
+            models.Ball.bowler_id == current_ball.bowler_id
+        ).all()
+
+        runs_conceded = sum((b.runs or 0) + (b.extra_runs or 0) for b in bowler_balls)
+        wickets_taken = sum(1 for b in bowler_balls if b.is_wicket)
+        legal_balls_bowled = sum(1 for b in bowler_balls if b.is_legal_ball)
+
+        bowler_overs = f"{legal_balls_bowled // 6}.{legal_balls_bowled % 6}"
+
+        economy = 0.0
+        if legal_balls_bowled > 0:
+            economy = runs_conceded / (legal_balls_bowled / 6)
+
+        player = db.query(models.Player).filter(
+            models.Player.id == current_ball.bowler_id
+        ).first()
+
         bowler_data = {
-            "id": bowler.id,
-            "name": bowler.name,
-            "overs": bowler.overs,
-            "runs": bowler.runs,
-            "wickets": bowler.wickets,
-            "economy": bowler.economy
+            "id": current_ball.bowler_id,
+            "name": player.name if player else "Unknown",
+            "overs": bowler_overs,
+            "runs": runs_conceded,
+            "wickets": wickets_taken,
+            "economy": round(economy, 2)
         }
+
     print("LIVE API HIT:", match_id)
+
     # =========================
-    # FINAL RESPONSE (REPLACE YOUR RETURN)
+    # FINAL RESPONSE
     # =========================
     return {
         "score": score,
         "overs": overs,
-        "batsmen": [
-            {
-                "id": b.player_id,  # 🔥 IMPORTANT (ADD THIS)
-                "name": b.name,
-                "runs": b.runs,
-                "balls": b.balls,
-                "fours": b.fours,
-                "sixes": b.sixes,
-                "is_striker": b.is_striker
-            }
-            for b in batsmen
-        ],
-        "current_bowler": bowler_data,  # 🔥 IMPORTANT
+        "batsmen": batsmen_data,
+        "bowler": bowler_data,
         "last_over": last_over,
         "extras": total_extras
     }

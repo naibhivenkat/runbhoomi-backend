@@ -6,6 +6,7 @@ class BallInput(BaseModel):
     extra_type: str | None = None
     extra_runs: int = 0
     next_batsman_id: str | None = None
+    current_bowler_id: str
 
 
 
