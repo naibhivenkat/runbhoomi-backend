@@ -410,14 +410,18 @@ def get_my_cricket(
 
 
 
+
+
 @router.post("/{fixture_or_match_id}/start_match")
 def start_match(
-        fixture_or_match_id: str,
-        payload: StartMatchRequest,
-        db: Session = Depends(get_db),
-        user_id: str = Depends(get_current_user_id)
+    fixture_or_match_id: str,
+    payload: StartMatchRequest,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
-    # 1. Resolve fixture or match
+    # -------------------------------
+    # 1. Resolve Fixture or Match
+    # -------------------------------
     fixture = db.query(models.TournamentMatch).filter(
         models.TournamentMatch.id == fixture_or_match_id
     ).first()
@@ -432,12 +436,14 @@ def start_match(
                 team_a_id=fixture.team_a_id,
                 team_b_id=fixture.team_b_id,
                 total_overs=payload.max_overs,
-                status="scheduled",  # 🔥 not live yet
+                status="scheduled",
                 tournament_id=fixture.tournament_id,
-                admin_id=user_id
+                admin_id=user_id,
+                innings=1
             )
             db.add(new_match)
             db.flush()
+
             match_id = new_match.id
             fixture.match_id = match_id
     else:
@@ -446,17 +452,19 @@ def start_match(
         ).first()
 
         if not match:
-            raise HTTPException(404, "Match or Fixture not found")
+            raise HTTPException(status_code=404, detail="Match or Fixture not found")
 
         match_id = match.id
 
-    # 2. Get match
+    # -------------------------------
+    # 2. Load Match + Admin Check
+    # -------------------------------
     target_match = db.query(models.Match).get(match_id)
     require_admin(db, user_id, target_match.tournament_id)
 
-    # 🔥🔥🔥 CORE FIX STARTS HERE
-
-    # 👉 If already live AND has balls → DO NOT RESET
+    # -------------------------------
+    # 3. Resume Logic (🔥 CRITICAL)
+    # -------------------------------
     existing_balls = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
     ).count()
@@ -468,59 +476,95 @@ def start_match(
             "resume": True
         }
 
-    # 👉 Only reset if NOT started
+    # -------------------------------
+    # 4. Reset ONLY if fresh start
+    # -------------------------------
     if target_match.status != "live":
         db.query(models.Batsman).filter(
             models.Batsman.match_id == match_id
-        ).delete()
-
-        db.query(models.Ball).filter(
-            models.Ball.match_id == match_id
         ).delete()
 
         db.query(models.Bowler).filter(
             models.Bowler.match_id == match_id
         ).delete()
 
-    # 🔥🔥🔥 CORE FIX ENDS HERE
+        db.query(models.Ball).filter(
+            models.Ball.match_id == match_id
+        ).delete()
 
-    # 3. Setup Openers
-    for p_id, striker_flag in [
-        (payload.striker_id, True),
-        (payload.non_striker_id, False)
-    ]:
-        player = db.query(models.Player).get(p_id)
-        if player:
+    # -------------------------------
+    # 5. Prevent Duplicate Creation
+    # -------------------------------
+    existing_batsmen = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id
+    ).count()
+
+    existing_bowler = db.query(models.Bowler).filter(
+        models.Bowler.match_id == match_id
+    ).count()
+
+    # -------------------------------
+    # 6. Setup Openers
+    # -------------------------------
+    if existing_batsmen == 0:
+        for p_id, striker_flag in [
+            (payload.striker_id, True),
+            (payload.non_striker_id, False)
+        ]:
+            player = db.query(models.Player).get(p_id)
+
+            if not player:
+                raise HTTPException(status_code=400, detail=f"Player {p_id} not found")
+
             db.add(models.Batsman(
+                id=generate_uuid(),
                 match_id=match_id,
                 player_id=player.id,
-                name=player.name,
+                name=player.name,   # 🔥 ALWAYS STORE NAME
+                runs=0,
+                balls=0,
+                fours=0,
+                sixes=0,
                 is_striker=striker_flag,
                 is_out=False
             ))
 
-    # 4. Setup Bowler
-    bowler_p = db.query(models.Player).get(payload.bowler_id)
-    if bowler_p:
+    # -------------------------------
+    # 7. Setup Bowler
+    # -------------------------------
+    if existing_bowler == 0:
+        bowler_p = db.query(models.Player).get(payload.bowler_id)
+
+        if not bowler_p:
+            raise HTTPException(status_code=400, detail="Bowler not found")
+
         db.add(models.Bowler(
             id=generate_uuid(),
             match_id=match_id,
-            name=bowler_p.name,
-            overs="0.0"
+            player_id=bowler_p.id,
+            name=bowler_p.name,  # 🔥 ALWAYS STORE NAME
+            overs="0.0",
+            runs=0,
+            wickets=0,
+            economy=0.0
         ))
 
-    # 5. Finalize match
+    # -------------------------------
+    # 8. Finalize Match
+    # -------------------------------
     target_match.status = "live"
     target_match.total_overs = payload.max_overs
 
     db.commit()
 
+    # -------------------------------
+    # 9. Response
+    # -------------------------------
     return {
         "message": "Match started successfully",
         "match_id": match_id,
         "resume": False
     }
-
 # TODO :
 
 # @router.post("/{fixture_or_match_id}/start_match")
