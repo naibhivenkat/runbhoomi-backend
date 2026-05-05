@@ -669,6 +669,30 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 
 @router.get("/{match_id}/live")
 def get_live_score(match_id: str, db: Session = Depends(get_db)):
+
+    # =========================
+    # 🔥 STEP 1: RESOLVE MATCH FIRST
+    # =========================
+    match = db.query(models.Match).filter(
+        models.Match.id == match_id
+    ).first()
+
+    if not match:
+        fixture = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.id == match_id
+        ).first()
+
+        if fixture and fixture.match_id:
+            match = db.query(models.Match).filter(
+                models.Match.id == fixture.match_id
+            ).first()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    # ✅ USE CORRECT MATCH ID EVERYWHERE
+    match_id = match.id
+
     # =========================
     # BALLS
     # =========================
@@ -678,7 +702,6 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
     wickets = sum(1 for b in balls if b.is_wicket)
-
     legal_balls = sum(1 for b in balls if b.is_legal_ball)
 
     overs = f"{legal_balls // 6}.{legal_balls % 6}"
@@ -725,17 +748,15 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
     total_extras = sum(b.extra_runs for b in balls)
 
     # =========================
-    # ✅ CURRENT BOWLER (FIXED — FROM BALLS)
+    # BOWLER (FROM BALLS)
     # =========================
     bowler_data = None
 
-    # get latest ball
     current_ball = db.query(models.Ball).filter(
         models.Ball.match_id == match_id
     ).order_by(models.Ball.id.desc()).first()
 
     if current_ball and current_ball.bowler_id:
-
         bowler_balls = db.query(models.Ball).filter(
             models.Ball.match_id == match_id,
             models.Ball.bowler_id == current_ball.bowler_id
@@ -764,43 +785,20 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
             "economy": economy
         }
 
-
-    # get match
-    match = db.query(models.Match).filter(
-        models.Match.id == match_id
-    ).first()
-
-    if not match:
-        fixture = db.query(models.TournamentMatch).filter(
-            models.TournamentMatch.id == match_id
-        ).first()
-
-        if fixture and fixture.match_id:
-            match = db.query(models.Match).filter(
-                models.Match.id == fixture.match_id
-            ).first()
-
-    if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
-
-    # 🔥 IMPORTANT: use resolved match_id
-    match_id = match.id
     # =========================
     # FINAL RESPONSE
     # =========================
-
     return {
         "score": score,
         "overs": overs,
-        "target": match.target or 0, 
-        "innings": match.current_innings or 1,
+        "target": match.target,   # 🔥 NO "or 0"
+        "innings": match.current_innings,
 
         "batsmen": batsmen_data,
         "bowler": bowler_data,
         "last_over": last_over,
         "extras": total_extras
     }
-
 
 @router.get("/{match_or_fixture_id}/resume")
 def resume_match(match_or_fixture_id: str, db: Session = Depends(get_db)):
@@ -914,11 +912,15 @@ def end_innings(match_id: str, db: Session = Depends(get_db)):
     # -------------------------
     # CALCULATE FIRST INNINGS SCORE
     # -------------------------
+    # balls = db.query(models.Ball).filter(
+    #     models.Ball.match_id == match.id,
+    #     models.Ball.innings == match.current_innings
+    # ).all()
+
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match.id,
-        models.Ball.innings == match.current_innings
+        models.Ball.innings == 1
     ).all()
-
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
 
     # -------------------------
