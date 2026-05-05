@@ -747,9 +747,9 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
 
         bowler_overs = f"{legal_balls_bowled // 6}.{legal_balls_bowled % 6}"
 
-        economy = 0.0
+        economy = "0.00"
         if legal_balls_bowled > 0:
-            economy = runs_conceded / (legal_balls_bowled / 6)
+            economy = f"{runs_conceded / (legal_balls_bowled / 6):.2f}"
 
         player = db.query(models.Player).filter(
             models.Player.id == current_ball.bowler_id
