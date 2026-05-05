@@ -866,3 +866,152 @@ def reset_match_scoring(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@router.post("/{match_id}/end_innings")
+def end_innings(match_id: str, db: Session = Depends(get_db)):
+    match = db.query(models.Match).filter(
+        models.Match.id == match_id
+    ).first()
+
+    if not match:
+        raise HTTPException(404, "Match not found")
+
+    # 🔥 Save first innings score as target
+    balls = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id,
+        models.Ball.innings == match.current_innings
+    ).all()
+
+    total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+
+    match.target = total_runs + 1
+    match.current_innings = 2
+
+    db.commit()
+
+    return {
+        "message": "Innings ended",
+        "target": match.target
+    }
+
+
+@router.post("/{match_id}/end_match")
+def end_match(match_id: str, db: Session = Depends(get_db)):
+    match = db.query(models.Match).filter(
+        models.Match.id == match_id
+    ).first()
+
+    if not match:
+        raise HTTPException(404, "Match not found")
+
+    balls = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).all()
+
+    total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+    wickets = sum(1 for b in balls if b.is_wicket)
+
+    match.status = "completed"
+    match.final_score = f"{total_runs}/{wickets}"
+
+    db.commit()
+
+    return {
+        "message": "Match completed",
+        "final_score": match.final_score
+    }
+
+
+
+@router.get("/{match_id}/scorecard")
+def get_scorecard(match_id: str, db: Session = Depends(get_db)):
+    balls = db.query(models.Ball).filter(
+        models.Ball.match_id == match_id
+    ).all()
+
+    # -----------------------
+    # TEAM SCORE
+    # -----------------------
+    total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
+    wickets = sum(1 for b in balls if b.is_wicket)
+
+    # -----------------------
+    # BATSMEN
+    # -----------------------
+    batsmen = db.query(models.Batsman).filter(
+        models.Batsman.match_id == match_id
+    ).all()
+
+    batsmen_data = [
+        {
+            "name": b.name,
+            "runs": b.runs,
+            "balls": b.balls,
+            "fours": b.fours,
+            "sixes": b.sixes,
+            "strike_rate": round((b.runs / b.balls) * 100, 2) if b.balls > 0 else 0
+        }
+        for b in batsmen
+    ]
+
+    # -----------------------
+    # BOWLERS (FROM BALLS 🔥)
+    # -----------------------
+    bowler_map = {}
+
+    for b in balls:
+        if not b.bowler_id:
+            continue
+
+        if b.bowler_id not in bowler_map:
+            bowler_map[b.bowler_id] = {
+                "runs": 0,
+                "wickets": 0,
+                "balls": 0
+            }
+
+        bowler_map[b.bowler_id]["runs"] += (b.runs or 0) + (b.extra_runs or 0)
+
+        if b.is_wicket:
+            bowler_map[b.bowler_id]["wickets"] += 1
+
+        if b.is_legal_ball:
+            bowler_map[b.bowler_id]["balls"] += 1
+
+    bowlers_data = []
+
+    for bowler_id, stats in bowler_map.items():
+        player = db.query(models.Player).filter(
+            models.Player.id == bowler_id
+        ).first()
+
+        overs = f"{stats['balls']//6}.{stats['balls']%6}"
+
+        economy = 0.0
+        if stats["balls"] > 0:
+            economy = stats["runs"] / (stats["balls"] / 6)
+
+        bowlers_data.append({
+            "name": player.name if player else "Unknown",
+            "overs": overs,
+            "runs": stats["runs"],
+            "wickets": stats["wickets"],
+            "economy": round(economy, 2)
+        })
+
+    # -----------------------
+    # EXTRAS
+    # -----------------------
+    extras = sum(b.extra_runs for b in balls)
+
+    # -----------------------
+    # FINAL RESPONSE
+    # -----------------------
+    return {
+        "score": f"{total_runs}/{wickets}",
+        "batsmen": batsmen_data,
+        "bowlers": bowlers_data,
+        "extras": extras
+    }
