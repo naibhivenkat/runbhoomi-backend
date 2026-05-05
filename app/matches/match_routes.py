@@ -868,24 +868,39 @@ def reset_match_scoring(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @router.post("/{match_id}/end_innings")
 def end_innings(match_id: str, db: Session = Depends(get_db)):
+    # 🔥 SAME RESOLVE LOGIC AS /ball
     match = db.query(models.Match).filter(
         models.Match.id == match_id
     ).first()
 
     if not match:
+        fixture = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.id == match_id
+        ).first()
+
+        if fixture and fixture.match_id:
+            match = db.query(models.Match).filter(
+                models.Match.id == fixture.match_id
+            ).first()
+
+    if not match:
         raise HTTPException(404, "Match not found")
 
-    # 🔥 Save first innings score as target
+    # -------------------------
+    # CALCULATE FIRST INNINGS SCORE
+    # -------------------------
     balls = db.query(models.Ball).filter(
-        models.Ball.match_id == match_id,
+        models.Ball.match_id == match.id,
         models.Ball.innings == match.current_innings
     ).all()
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
 
+    # -------------------------
+    # UPDATE MATCH
+    # -------------------------
     match.target = total_runs + 1
     match.current_innings = 2
 
@@ -899,31 +914,64 @@ def end_innings(match_id: str, db: Session = Depends(get_db)):
 
 @router.post("/{match_id}/end_match")
 def end_match(match_id: str, db: Session = Depends(get_db)):
+    # -------------------------------
+    # 🔥 RESOLVE MATCH OR FIXTURE ID
+    # -------------------------------
     match = db.query(models.Match).filter(
         models.Match.id == match_id
     ).first()
 
     if not match:
-        raise HTTPException(404, "Match not found")
+        fixture = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.id == match_id
+        ).first()
 
+        if fixture and fixture.match_id:
+            match = db.query(models.Match).filter(
+                models.Match.id == fixture.match_id
+            ).first()
+
+    if not match:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    # -------------------------------
+    # 🔥 CALCULATE FINAL SCORE
+    # -------------------------------
     balls = db.query(models.Ball).filter(
-        models.Ball.match_id == match_id
+        models.Ball.match_id == match.id
     ).all()
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
     wickets = sum(1 for b in balls if b.is_wicket)
 
+    # -------------------------------
+    # 🔥 MATCH RESULT LOGIC
+    # -------------------------------
+    result = "Match tied"
+
+    if match.target:
+        if total_runs >= match.target:
+            result = "Batting team won"
+        else:
+            result = "Bowling team won"
+
+    # -------------------------------
+    # 🔥 UPDATE MATCH
+    # -------------------------------
     match.status = "completed"
     match.final_score = f"{total_runs}/{wickets}"
+    match.result = result
 
     db.commit()
 
+    # -------------------------------
+    # RESPONSE
+    # -------------------------------
     return {
         "message": "Match completed",
-        "final_score": match.final_score
+        "final_score": match.final_score,
+        "result": result
     }
-
-
 
 @router.get("/{match_id}/scorecard")
 def get_scorecard(match_id: str, db: Session = Depends(get_db)):
