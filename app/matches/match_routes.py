@@ -1239,10 +1239,9 @@ def create_match(
 
 @router.get("/{match_id}")
 def get_match(
-    match_id: str,
-    db: Session = Depends(get_db)
+        match_id: str,
+        db: Session = Depends(get_db)
 ):
-
     match = db.query(models.Match).filter(
         models.Match.id == match_id
     ).first()
@@ -1313,3 +1312,95 @@ def get_match(
         "created_at":
             match.created_at
     }
+
+
+@router.get("/user/{email}")
+def get_matches_by_user(
+        email: str,
+        db: Session = Depends(get_db)
+):
+    ########################################################
+    # FIND PLAYER
+    ########################################################
+
+    player = db.query(models.Player).filter(
+        models.Player.email == email
+    ).first()
+
+    if not player:
+        return []
+
+    ########################################################
+    # FIND MATCHES
+    ########################################################
+
+    matches = db.query(models.Match).filter(
+        (
+                models.Match.admin_id == player.id
+        )
+    ).order_by(
+        models.Match.created_at.desc()
+    ).all()
+
+    ########################################################
+    # RESPONSE
+    ########################################################
+
+    data = []
+
+    for match in matches:
+
+        innings = db.query(models.Innings).filter(
+            models.Innings.match_id == match.id
+        ).order_by(
+            models.Innings.innings_no.asc()
+        ).all()
+
+        innings_data = []
+
+        for inn in innings:
+            innings_data.append({
+                "innings_no": inn.innings_no,
+                "runs": inn.runs,
+                "wickets": inn.wickets,
+                "overs": inn.overs,
+                "target": inn.target
+            })
+
+        data.append({
+            "id": match.id,
+
+            "status": match.status,
+
+            "target": match.target,
+
+            "max_overs": match.total_overs,
+
+            "current_innings":
+                match.current_innings,
+
+            "teamA":
+                match.teamA.name
+                if match.teamA else "Team A",
+
+            "teamB":
+                match.teamB.name
+                if match.teamB else "Team B",
+
+            "teamA_id":
+                match.team_a_id,
+
+            "teamB_id":
+                match.team_b_id,
+
+            "innings":
+                innings_data,
+
+            "created_at":
+                match.created_at,
+
+            "is_admin":
+                match.admin_id == player.id
+        })
+
+    return data
