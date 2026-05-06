@@ -751,7 +751,7 @@
 
 import uuid
 from datetime import datetime
-
+from sqlalchemy import UniqueConstraint
 from sqlalchemy import (
     Column,
     Integer,
@@ -968,6 +968,14 @@ class TeamPlayer(Base):
         back_populates="squads"
     )
 
+    __table_args__ = (
+        UniqueConstraint(
+            "team_id",
+            "player_id",
+            name="uq_team_player"
+        ),
+    )
+
 
 # =========================================================
 # MATCH
@@ -1163,6 +1171,29 @@ class MatchInnings(Base):
     match = relationship(
         "Match",
         back_populates="innings"
+    )
+
+    balls = relationship(
+        "Ball",
+        cascade="all, delete-orphan"
+    )
+
+    batsmen = relationship(
+        "Batsman",
+        cascade="all, delete-orphan"
+    )
+
+    bowlers = relationship(
+        "Bowler",
+        cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "match_id",
+            "innings_no",
+            name="uq_match_innings"
+        ),
     )
 
 
@@ -1461,6 +1492,14 @@ class Tournament(Base):
 class TournamentTeam(Base):
     __tablename__ = "tournament_teams"
 
+    __table_args__ = (
+        UniqueConstraint(
+            "tournament_id",
+            "team_id",
+            name="uq_tournament_team"
+        ),
+    )
+
     id = Column(
         String,
         primary_key=True,
@@ -1503,7 +1542,10 @@ class TournamentMatch(Base):
         default=generate_uuid
     )
 
-    tournament_id = Column(String)
+    tournament_id = Column(
+        String,
+        ForeignKey("tournaments.id")
+    )
 
     team_a = Column(String)
 
@@ -1511,11 +1553,13 @@ class TournamentMatch(Base):
 
     match_date = Column(String)
 
-    stage = Column(String)
-
     winner = Column(String, nullable=True)
 
-    match_id = Column(String, nullable=True)
+    match_id = Column(
+        String,
+        ForeignKey("matches.id"),
+        nullable=True
+    )
 
     team_a_id = Column(String)
 
@@ -1548,7 +1592,12 @@ class TournamentPoints(Base):
 
     tournament_id = Column(String)
 
-    team_name = Column(String)
+    team_id = Column(
+        String,
+        ForeignKey("teams.id")
+    )
+
+    team = relationship("Team")
 
     played = Column(Integer, default=0)
 
