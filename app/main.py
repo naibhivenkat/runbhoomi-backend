@@ -15,6 +15,32 @@ from app.tournaments.tournament_routes import router as tournament_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from app.matches import (
+    match_routes,
+    scoring_routes,
+    innings_routes,
+    live_routes,
+    scorecard_routes,
+    undo_routes,
+    bowler_routes,
+    timeline_routes,
+    stats_routes,
+    partnership_routes,
+    over_routes,
+    fow_routes,
+    commentary_routes,
+    toss_routes,
+    match_state_routes,
+    player_stats_routes,
+    leaderboard_routes,
+    required_run_routes,
+    powerplay_routes,
+    runrate_routes,
+    admin_routes,
+    playingxi_routes,
+    websocket_routes
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,11 +81,33 @@ app.add_middleware(
 
 # Router Inclusions
 app.include_router(auth_router)
-app.include_router(match_router)
-app.include_router(scoring_router)
+#app.include_router(match_router)
+#app.include_router(scoring_router)
 app.include_router(tournament_router)
 
-
+app.include_router(match_routes.router)
+app.include_router(scoring_routes.router)
+app.include_router(innings_routes.router)
+app.include_router(live_routes.router)
+app.include_router(scorecard_routes.router)
+app.include_router(undo_routes.router)
+app.include_router(bowler_routes.router)
+app.include_router(timeline_routes.router)
+app.include_router(stats_routes.router)
+app.include_router(partnership_routes.router)
+app.include_router(over_routes.router)
+app.include_router(fow_routes.router)
+app.include_router(commentary_routes.router)
+app.include_router(toss_routes.router)
+app.include_router(match_state_routes.router)
+app.include_router(player_stats_routes.router)
+app.include_router(leaderboard_routes.router)
+app.include_router(required_run_routes.router)
+app.include_router(powerplay_routes.router)
+app.include_router(runrate_routes.router)
+app.include_router(admin_routes.router)
+app.include_router(playingxi_routes.router)
+app.include_router(websocket_routes.router)
 # =========================
 # Base & Health Routes
 # =========================
