@@ -757,20 +757,40 @@ def start_match(
 
 @router.get("/tournament/{tournament_id}")
 def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db)):
-    matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
+    # matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
+
+    results = db.query(
+        models.TournamentMatch,
+        models.Match.status
+    ).outerjoin(
+        models.Match, models.TournamentMatch.match_id == models.Match.id
+    ).filter(models.TournamentMatch.tournament_id == tournament_id).all()
+    # return [
+    #     {
+    #         "id": m.id,  # Fixture ID
+    #         "match_id": m.match_id,
+    #         "team_a": m.team_a,
+    #         "team_b": m.team_b,
+    #         "team_a_id": m.team_a_id,
+    #         "team_b_id": m.team_b_id,
+    #         "group_id": m.group_id,
+    #         "winner": m.winner,
+    #         "is_live": True if m.match_id else False
+    #     } for m in matches
+    # ]
+
     return [
-        {
-            "id": m.id,  # Fixture ID
-            "match_id": m.match_id,
-            "team_a": m.team_a,
-            "team_b": m.team_b,
-            "team_a_id": m.team_a_id,
-            "team_b_id": m.team_b_id,
-            "group_id": m.group_id,
-            "winner": m.winner,
-            "is_live": True if m.match_id else False
-        } for m in matches
-    ]
+            {
+                "id": tm.id,
+                "match_id": tm.match_id,
+                "team_a": tm.team_a,
+                "team_b": tm.team_b,
+
+                "status": status or "upcoming", # Pass the actual match status
+                "winner": tm.winner,
+                "is_live": status == "live"
+            } for tm, status in results
+        ]
 
 
 @router.get("/{match_id}/live")
