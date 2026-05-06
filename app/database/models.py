@@ -135,6 +135,7 @@ class Match(Base):
     balls = relationship("Ball", back_populates="match", cascade="all, delete-orphan")
     bowlers = relationship("Bowler", back_populates="match", cascade="all, delete-orphan")
     target = Column(Integer, nullable=True)
+    fixture_id = Column(String, nullable=True)
 
 
 
