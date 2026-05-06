@@ -1203,7 +1203,7 @@
 #     }
 
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import models
@@ -1238,14 +1238,78 @@ def create_match(
 
 
 @router.get("/{match_id}")
-def get_match(match_id: str, db: Session = Depends(get_db)):
+def get_match(
+    match_id: str,
+    db: Session = Depends(get_db)
+):
+
     match = db.query(models.Match).filter(
         models.Match.id == match_id
     ).first()
 
+    ########################################################
+    # SAFE CHECK
+    ########################################################
+
+    if not match:
+        raise HTTPException(
+            status_code=404,
+            detail="Match not found"
+        )
+
+    ########################################################
+    # INNINGS
+    ########################################################
+
+    innings = db.query(models.Innings).filter(
+        models.Innings.match_id == match.id
+    ).order_by(
+        models.Innings.innings_no.asc()
+    ).all()
+
+    innings_data = []
+
+    for inn in innings:
+        innings_data.append({
+            "innings_no": inn.innings_no,
+            "batting_team_id": inn.batting_team_id,
+            "bowling_team_id": inn.bowling_team_id,
+            "runs": inn.runs,
+            "wickets": inn.wickets,
+            "overs": inn.overs,
+            "target": inn.target
+        })
+
+    ########################################################
+    # RESPONSE
+    ########################################################
+
     return {
         "id": match.id,
+
         "status": match.status,
+
         "target": match.target,
-        "innings": match.current_innings
+
+        "current_innings":
+            match.current_innings,
+
+        "team_a_id":
+            match.team_a_id,
+
+        "team_b_id":
+            match.team_b_id,
+
+        "team_a_name":
+            match.teamA.name
+            if match.teamA else None,
+
+        "team_b_name":
+            match.teamB.name
+            if match.teamB else None,
+
+        "innings": innings_data,
+
+        "created_at":
+            match.created_at
     }
