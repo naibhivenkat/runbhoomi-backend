@@ -38,7 +38,8 @@ from app.matches import (
     runrate_routes,
     admin_routes,
     playingxi_routes,
-    websocket_routes
+    websocket_routes,
+team_routes
 )
 
 
@@ -108,6 +109,7 @@ app.include_router(runrate_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(playingxi_routes.router)
 app.include_router(websocket_routes.router)
+app.include_router(team_routes.router)
 # =========================
 # Base & Health Routes
 # =========================
