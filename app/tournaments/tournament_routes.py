@@ -473,17 +473,55 @@ def generate_fixtures(
             fixtures = paired_rounds(team_ids)
 
             def create_match_entry(a_id, b_id, round_num):
-                return TournamentMatch(
+
+                ####################################################
+                # CREATE REAL MATCH
+                ####################################################
+
+                match = models.Match(
+                    id=generate_uuid(),
+
                     tournament_id=tournament_id,
+
                     team_a_id=a_id,
+
                     team_b_id=b_id,
-                    team_a=db.query(Team).get(a_id).name,
-                    team_b=db.query(Team).get(b_id).name,
-                    match_type="league",
-                    group_id=g.id,
-                    round=round_num
+
+                    total_overs=tournament.overs,
+
+                    status="scheduled"
                 )
 
+                db.add(match)
+
+                db.flush()
+
+                ####################################################
+                # CREATE FIXTURE
+                ####################################################
+
+                return TournamentMatch(
+
+                    id=generate_uuid(),
+
+                    tournament_id=tournament_id,
+
+                    match_id=match.id,
+
+                    team_a_id=a_id,
+
+                    team_b_id=b_id,
+
+                    team_a=db.query(Team).get(a_id).name,
+
+                    team_b=db.query(Team).get(b_id).name,
+
+                    match_type="league",
+
+                    group_id=g.id,
+
+                    round=round_num
+                )
             # First Round (A vs B)
             for a, b in fixtures:
                 db.add(create_match_entry(a, b, 1))
@@ -1158,6 +1196,7 @@ def get_matches(tournament_id: str, db: Session = Depends(get_db)):
             "match_time": m.match_time,
 
             "is_live": False,
+            "match_id": m.match_id,
         })
 
     return result
