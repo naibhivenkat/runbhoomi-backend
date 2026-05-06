@@ -186,7 +186,6 @@ def set_playing_xi(
     return {"message": "Playing XI set"}
 
 
-
 @router.post("/{match_id}/ball")
 def add_ball(
         match_id: str,
@@ -242,7 +241,7 @@ def add_ball(
         ball=ball_num,
         batsman_id=striker.player_id,
         non_striker_id=non_striker.player_id,
-        bowler_id=payload.current_bowler_id, # Added bowler reference
+        bowler_id=payload.current_bowler_id,  # Added bowler reference
         runs=runs,
         extra_type=extra_type,
         extra_runs=extra_runs,
@@ -263,7 +262,8 @@ def add_ball(
         striker.is_striker = False
         if next_batsman_id:
             player = db.query(models.Player).get(next_batsman_id)
-            db.add(models.Batsman(match_id=match_id, player_id=player.id, name=player.name, is_striker=True, is_out=False))
+            db.add(
+                models.Batsman(match_id=match_id, player_id=player.id, name=player.name, is_striker=True, is_out=False))
     else:
         if not is_extra and runs % 2 == 1:
             striker.is_striker, non_striker.is_striker = False, True
@@ -275,9 +275,6 @@ def add_ball(
 
     db.commit()
     return {"message": "Ball added", "over": over, "ball": ball_num}
-
-
-
 
 
 # @router.post("/{match_id}/ball")
@@ -757,6 +754,7 @@ def start_match(
 
     return {"message": "Match started successfully", "match_id": match_id, "resume": False}
 
+
 @router.get("/tournament/{tournament_id}")
 def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db)):
     matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
@@ -1018,19 +1016,19 @@ def end_innings(match_id: str, db: Session = Depends(get_db)):
 
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
 
-    # 2. Update Match State
     match.target = total_runs + 1
     match.current_innings = 2
-    match.status = "innings_break"
+    match.status = "live"  # Ensure it stays live for the 2nd innings
 
     db.commit()
-    db.refresh(match)  # 🔥 Refresh object to reflect changes in the next API call
+    db.refresh(match)  # 🔥 EXTREMELY IMPORTANT: Updates the instance with the new target
 
     return {
-        "status": "success",
         "message": "Innings ended",
         "target": match.target
     }
+
+
 @router.post("/{match_id}/end_match")
 def end_match(match_id: str, db: Session = Depends(get_db)):
     # -------------------------------
