@@ -82,8 +82,6 @@ app.add_middleware(
 
 # Router Inclusions
 app.include_router(auth_router)
-#app.include_router(match_router)
-#app.include_router(scoring_router)
 app.include_router(tournament_router)
 
 app.include_router(match_routes.router)
@@ -110,6 +108,7 @@ app.include_router(admin_routes.router)
 app.include_router(playingxi_routes.router)
 app.include_router(websocket_routes.router)
 app.include_router(team_routes.router)
+
 # =========================
 # Base & Health Routes
 # =========================

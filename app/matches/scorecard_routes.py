@@ -3,37 +3,61 @@ from sqlalchemy.orm import Session
 
 from app.database import models
 from app.database.db import get_db
-from app.matches.match_service import resolve_match
+
 
 router = APIRouter(prefix="/scorecard")
 
 
 @router.get("/{match_id}")
-def scorecard(
-        match_id: str,
-        db: Session = Depends(get_db)
+def get_scorecard(
+    match_id: str,
+    db: Session = Depends(get_db)
 ):
-    match = resolve_match(db, match_id)
 
-    innings_list = db.query(models.MatchInnings).filter(
-        models.MatchInnings.match_id == match.id
-    ).order_by(models.MatchInnings.innings_no.asc()).all()
+    match = db.query(models.Match).filter(
+        models.Match.id == match_id
+    ).first()
+
+    if not match:
+        return {
+            "error": "Match not found"
+        }
+
+    innings = db.query(
+        models.MatchInnings
+    ).filter(
+        models.MatchInnings.match_id
+        == match_id
+    ).all()
 
     innings_data = []
 
-    for innings in innings_list:
-        batsmen = db.query(models.Batsman).filter(
-            models.Batsman.innings_id == innings.id
+    for inn in innings:
+
+        batsmen = db.query(
+            models.Batsman
+        ).filter(
+            models.Batsman.innings_id
+            == inn.id
         ).all()
 
-        bowlers = db.query(models.Bowler).filter(
-            models.Bowler.innings_id == innings.id
+        bowlers = db.query(
+            models.Bowler
+        ).filter(
+            models.Bowler.innings_id
+            == inn.id
         ).all()
 
         innings_data.append({
-            "innings": innings.innings_no,
-            "score": f"{innings.runs}/{innings.wickets}",
-            "overs": innings.overs,
+
+            "innings_no":
+                inn.innings_no,
+
+            "score":
+                f"{inn.runs}/{inn.wickets}",
+
+            "overs":
+                inn.overs,
 
             "batsmen": [
                 {
@@ -41,7 +65,8 @@ def scorecard(
                     "runs": b.runs,
                     "balls": b.balls,
                     "fours": b.fours,
-                    "sixes": b.sixes
+                    "sixes": b.sixes,
+                    "is_out": b.is_out
                 }
                 for b in batsmen
             ],
@@ -59,5 +84,6 @@ def scorecard(
 
     return {
         "match_id": match.id,
+        "status": match.status,
         "innings": innings_data
     }

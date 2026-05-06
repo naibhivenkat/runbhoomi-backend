@@ -300,74 +300,189 @@ router = APIRouter(prefix="/scoring")
 @router.post("/{match_id}/start")
 def start_match(
         match_id: str,
-        striker_id: str,
-        non_striker_id: str,
-        bowler_id: str,
+        body: dict,
         db: Session = Depends(get_db)
 ):
+
+    ########################################################
+    # MATCH
+    ########################################################
+
     match = resolve_match(db, match_id)
 
-    existing = db.query(models.MatchInnings).filter(
-        models.MatchInnings.match_id == match.id
+    ########################################################
+    # BODY
+    ########################################################
+
+    striker_id = body.get("striker_id")
+
+    non_striker_id = body.get(
+        "non_striker_id"
+    )
+
+    bowler_id = body.get(
+        "bowler_id"
+    )
+
+    ########################################################
+    # VALIDATE
+    ########################################################
+
+    if not striker_id:
+        raise HTTPException(
+            400,
+            "striker_id required"
+        )
+
+    if not non_striker_id:
+        raise HTTPException(
+            400,
+            "non_striker_id required"
+        )
+
+    if not bowler_id:
+        raise HTTPException(
+            400,
+            "bowler_id required"
+        )
+
+    ########################################################
+    # ALREADY STARTED
+    ########################################################
+
+    existing = db.query(
+        models.MatchInnings
+    ).filter(
+        models.MatchInnings.match_id
+        == match.id
     ).first()
 
     if existing:
         return {
-            "message": "Already started"
+            "message":
+                "Already started"
         }
+
+    ########################################################
+    # CREATE INNINGS
+    ########################################################
 
     innings = models.MatchInnings(
         id=generate_uuid(),
+
         match_id=match.id,
+
         innings_no=1,
+
         batting_team_id=match.team_a_id,
+
         bowling_team_id=match.team_b_id,
+
         status="live"
     )
 
     db.add(innings)
 
-    striker = db.query(models.Player).get(striker_id)
-    non_striker = db.query(models.Player).get(non_striker_id)
-    bowler = db.query(models.Player).get(bowler_id)
+    ########################################################
+    # PLAYERS
+    ########################################################
+
+    striker = db.query(
+        models.Player
+    ).get(striker_id)
+
+    non_striker = db.query(
+        models.Player
+    ).get(non_striker_id)
+
+    bowler = db.query(
+        models.Player
+    ).get(bowler_id)
+
+    if not striker:
+        raise HTTPException(
+            404,
+            "Striker not found"
+        )
+
+    if not non_striker:
+        raise HTTPException(
+            404,
+            "Non striker not found"
+        )
+
+    if not bowler:
+        raise HTTPException(
+            404,
+            "Bowler not found"
+        )
+
+    ########################################################
+    # BATSMEN
+    ########################################################
 
     db.add(models.Batsman(
         id=generate_uuid(),
+
         match_id=match.id,
+
         innings_id=innings.id,
+
         player_id=striker.id,
+
         team_id=innings.batting_team_id,
+
         name=striker.name,
+
         is_striker=True
     ))
 
     db.add(models.Batsman(
         id=generate_uuid(),
+
         match_id=match.id,
+
         innings_id=innings.id,
+
         player_id=non_striker.id,
+
         team_id=innings.batting_team_id,
+
         name=non_striker.name,
+
         is_striker=False
     ))
 
+    ########################################################
+    # BOWLER
+    ########################################################
+
     db.add(models.Bowler(
         id=generate_uuid(),
+
         match_id=match.id,
+
         innings_id=innings.id,
+
         player_id=bowler.id,
+
         team_id=innings.bowling_team_id,
+
         name=bowler.name
     ))
+
+    ########################################################
+    # MATCH STATUS
+    ########################################################
 
     match.status = "live"
 
     db.commit()
 
     return {
-        "message": "Match started"
+        "success": True,
+        "innings_id": innings.id
     }
-
 
 @router.post("/{match_id}/ball")
 def add_ball(
