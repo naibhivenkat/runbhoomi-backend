@@ -423,16 +423,12 @@ def get_my_cricket(
     }
 
 
-
-
-
-
 @router.post("/{fixture_or_match_id}/start_match")
 def start_match(
-    fixture_or_match_id: str,
-    payload: StartMatchRequest,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+        fixture_or_match_id: str,
+        payload: StartMatchRequest,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)
 ):
     # -------------------------------
     # 1. Resolve Fixture or Match
@@ -534,7 +530,7 @@ def start_match(
                 id=generate_uuid(),
                 match_id=match_id,
                 player_id=player.id,
-                name=player.name,   # 🔥 ALWAYS STORE NAME
+                name=player.name,  # 🔥 ALWAYS STORE NAME
                 runs=0,
                 balls=0,
                 fours=0,
@@ -579,76 +575,6 @@ def start_match(
     }
 
 
-# TODO :
-
-# @router.post("/{fixture_or_match_id}/start_match")
-# def start_match(
-#         fixture_or_match_id: str,
-#         payload: StartMatchRequest,
-#         db: Session = Depends(get_db),
-#         user_id: str = Depends(get_current_user_id)
-# ):
-#     # 1. Try to find if this is a Tournament Fixture first
-#     fixture = db.query(models.TournamentMatch).filter(models.TournamentMatch.id == fixture_or_match_id).first()
-#
-#     match_id = None
-#
-#     if fixture:
-#         # If the fixture already has a match_id, use it.
-#         # Otherwise, CREATE a new Match record for this fixture.
-#         if fixture.match_id:
-#             match_id = fixture.match_id
-#         else:
-#             new_match = models.Match(
-#                 team_a_id=fixture.team_a_id,
-#                 team_b_id=fixture.team_b_id,
-#                 total_overs=payload.max_overs,
-#                 status="live",
-#                 tournament_id=fixture.tournament_id,
-#                 admin_id=user_id
-#             )
-#             db.add(new_match)
-#             db.flush()  # 🔥 Generates the ID immediately
-#             match_id = new_match.id
-#             fixture.match_id = match_id  # Link fixture to match
-#     else:
-#         # If not a fixture, assume it's a direct Match ID
-#         match = db.query(models.Match).filter(models.Match.id == fixture_or_match_id).first()
-#         if not match:
-#             raise HTTPException(404, "Match or Fixture not found")
-#         match_id = match.id
-#
-#     # 2. Permission Check using the resolved match context
-#     # (Assuming you fetch the match object to get tournament_id)
-#     target_match = db.query(models.Match).get(match_id)
-#     require_admin(db, user_id, target_match.tournament_id)
-#
-#     # 3. Clear existing setup data (Reset for re-starts)
-#     db.query(models.Batsman).filter(models.Batsman.match_id == match_id).delete()
-#     db.query(models.Ball).filter(models.Ball.match_id == match_id).delete()
-#     db.query(models.Bowler).filter(models.Bowler.match_id == match_id).delete()
-#
-#     # 4. Setup Openers
-#     for p_id, striker_flag in [(payload.striker_id, True), (payload.non_striker_id, False)]:
-#         player = db.query(models.Player).get(p_id)
-#         if player:
-#             db.add(models.Batsman(match_id=match_id, player_id=player.id, name=player.name, is_striker=striker_flag,
-#                                   is_out=False))
-#
-#     # 5. Setup Opening Bowler
-#     bowler_p = db.query(models.Player).get(payload.bowler_id)
-#     if bowler_p:
-#         db.add(models.Bowler(id=generate_uuid(), match_id=match_id, name=bowler_p.name, overs="0.0"))
-#
-#     # 6. Finalize Status
-#     target_match.status = "live"
-#     target_match.total_overs = payload.max_overs
-#
-#     db.commit()
-#     return {"message": "Match started successfully", "match_id": match_id}
-
-
-
 @router.get("/tournament/{tournament_id}")
 def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db)):
     matches = db.query(TournamentMatch).filter_by(tournament_id=tournament_id).all()
@@ -669,7 +595,6 @@ def get_matches_by_tournament(tournament_id: str, db: Session = Depends(get_db))
 
 @router.get("/{match_id}/live")
 def get_live_score(match_id: str, db: Session = Depends(get_db)):
-
     # =========================
     # 🔥 STEP 1: RESOLVE MATCH FIRST
     # =========================
@@ -791,7 +716,7 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
     return {
         "score": score,
         "overs": overs,
-        "target": match.target,   # 🔥 NO "or 0"
+        "target": match.target,  # 🔥 NO "or 0"
         "innings": match.current_innings,
 
         "batsmen": batsmen_data,
@@ -800,9 +725,9 @@ def get_live_score(match_id: str, db: Session = Depends(get_db)):
         "extras": total_extras
     }
 
+
 @router.get("/{match_or_fixture_id}/resume")
 def resume_match(match_or_fixture_id: str, db: Session = Depends(get_db)):
-
     # 1️⃣ Try direct match
     match = db.query(models.Match).filter(
         models.Match.id == match_or_fixture_id
@@ -840,6 +765,7 @@ def resume_match(match_or_fixture_id: str, db: Session = Depends(get_db)):
         "balls_count": len(balls),
         "has_data": True if balls else False
     }
+
 
 @router.delete("/{match_id}/ball/last_ball_undo")
 def undo_last_ball(
@@ -912,30 +838,26 @@ def end_innings(match_id: str, db: Session = Depends(get_db)):
     # -------------------------
     # CALCULATE FIRST INNINGS SCORE
     # -------------------------
-    # balls = db.query(models.Ball).filter(
-    #     models.Ball.match_id == match.id,
-    #     models.Ball.innings == match.current_innings
-    # ).all()
 
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match.id,
         models.Ball.innings == 1
     ).all()
+
     total_runs = sum((b.runs or 0) + (b.extra_runs or 0) for b in balls)
 
-    # -------------------------
-    # UPDATE MATCH
-    # -------------------------
+    # UPDATE MATCH TABLE
     match.target = total_runs + 1
     match.current_innings = 2
+    match.status = "innings_break"  # Helpful for UI state
 
     db.commit()
+    db.refresh(match)  # 🔥 Ensure the object has the new data
 
     return {
         "message": "Innings ended",
         "target": match.target
     }
-
 
 @router.post("/{match_id}/end_match")
 def end_match(match_id: str, db: Session = Depends(get_db)):
@@ -997,6 +919,7 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
         "final_score": match.final_score,
         "result": result
     }
+
 
 @router.get("/{match_id}/scorecard")
 def get_scorecard(match_id: str, db: Session = Depends(get_db)):
@@ -1060,7 +983,7 @@ def get_scorecard(match_id: str, db: Session = Depends(get_db)):
             models.Player.id == bowler_id
         ).first()
 
-        overs = f"{stats['balls']//6}.{stats['balls']%6}"
+        overs = f"{stats['balls'] // 6}.{stats['balls'] % 6}"
 
         economy = 0.0
         if stats["balls"] > 0:
