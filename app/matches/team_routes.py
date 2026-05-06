@@ -26,7 +26,7 @@ router = APIRouter(prefix="/teams")
 @router.post("/create")
 def create_team(
     body: dict,
-    db: Session = Depends(get_db())
+    db: Session = Depends(get_db)
 ):
 
     name = body.get("name")
