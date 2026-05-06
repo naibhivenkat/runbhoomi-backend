@@ -472,13 +472,18 @@ def generate_fixtures(
             # Formula: Team A vs Team B
             fixtures = paired_rounds(team_ids)
 
-            def create_match_entry(a_id, b_id, round_num):
+            def create_match_entry(
+                    a_id,
+                    b_id,
+                    round_num
+            ):
 
                 ####################################################
                 # CREATE REAL MATCH
                 ####################################################
 
                 match = models.Match(
+
                     id=generate_uuid(),
 
                     tournament_id=tournament_id,
@@ -500,7 +505,7 @@ def generate_fixtures(
                 # CREATE FIXTURE
                 ####################################################
 
-                return TournamentMatch(
+                tm = TournamentMatch(
 
                     id=generate_uuid(),
 
@@ -522,15 +527,17 @@ def generate_fixtures(
 
                     round=round_num
                 )
+
+                db.add(tm)
             # First Round (A vs B)
             for a, b in fixtures:
-                db.add(create_match_entry(a, b, 1))
+                create_match_entry(a, b, 1)
 
             # 🔥 DOUBLE ROUND ROBIN LOGIC: Second Round (B vs A)
             if is_double_round:
                 for a, b in fixtures:
                     # We swap a and b so Team B is now Team A (Home/Away logic)
-                    db.add(create_match_entry(b, a, 2))
+                    create_match_entry(b, a, 2)
 
     db.commit()
 
