@@ -1260,10 +1260,10 @@ def get_match(
     # INNINGS
     ########################################################
 
-    innings = db.query(models.Innings).filter(
-        models.Innings.match_id == match.id
+    innings = db.query(models.MatchInnings).filter(
+        models.MatchInnings.match_id == match.id
     ).order_by(
-        models.Innings.innings_no.asc()
+        models.MatchInnings.innings_no.asc()
     ).all()
 
     innings_data = []
@@ -1350,10 +1350,10 @@ def get_matches_by_user(
 
     for match in matches:
 
-        innings = db.query(models.Innings).filter(
-            models.Innings.match_id == match.id
+        innings = db.query(models.MatchInnings).filter(
+            models.MatchInnings.match_id == match.id
         ).order_by(
-            models.Innings.innings_no.asc()
+            models.MatchInnings.innings_no.asc()
         ).all()
 
         innings_data = []
