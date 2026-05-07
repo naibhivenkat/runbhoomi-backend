@@ -1346,6 +1346,11 @@ class Bowler(Base):
         back_populates="bowlers"
     )
 
+    balls = Column(
+        Integer,
+        default=0
+    )
+
 
 # =========================================================
 # BALL
