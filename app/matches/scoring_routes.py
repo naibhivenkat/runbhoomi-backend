@@ -487,21 +487,40 @@ def start_match(
 @router.post("/{match_id}/ball")
 def add_ball(
         match_id: str,
-        runs: int = 0,
-        extra_type: str = None,
-        wicket: bool = False,
-        next_batsman_id: str = None,
-        bowler_id: str = None,
-        wicket_type: str = None,
+        body: dict,
         db: Session = Depends(get_db)
 ):
+
+    # =====================================================
+    # BODY
+    # =====================================================
+
+    runs = int(body.get("runs", 0))
+
+    extra_type = body.get("extra_type")
+
+    wicket = bool(body.get("wicket", False))
+
+    next_batsman_id = body.get(
+        "next_batsman_id"
+    )
+
+    bowler_id = body.get("bowler_id")
+
+    wicket_type = body.get(
+        "wicket_type"
+    )
+
     # =====================================================
     # MATCH
     # =====================================================
 
     match = resolve_match(db, match_id)
 
-    innings = get_current_innings(db, match.id)
+    innings = get_current_innings(
+        db,
+        match.id
+    )
 
     # =====================================================
     # CURRENT BALL STATE
@@ -554,20 +573,36 @@ def add_ball(
             "Bowler required"
         )
 
-    current_bowler = db.query(models.Bowler).filter(
+    current_bowler = db.query(
+        models.Bowler
+    ).filter(
         models.Bowler.innings_id == innings.id,
         models.Bowler.player_id == bowler_id
     ).first()
 
     if not current_bowler:
-        player = db.query(models.Player).get(bowler_id)
+
+        player = db.query(
+            models.Player
+        ).get(bowler_id)
+
+        if not player:
+            raise HTTPException(
+                404,
+                "Bowler not found"
+            )
 
         current_bowler = models.Bowler(
             id=generate_uuid(),
+
             match_id=match.id,
+
             innings_id=innings.id,
+
             player_id=player.id,
+
             team_id=innings.bowling_team_id,
+
             name=player.name
         )
 
@@ -585,19 +620,12 @@ def add_ball(
 
     is_legbye = extra_type == "legbye"
 
-    is_extra = extra_type in [
-        "wide",
-        "no_ball",
-        "bye",
-        "legbye"
-    ]
-
     is_legal_ball = not (
         is_wide or is_no_ball
     )
 
     # =====================================================
-    # TOTAL BALL RUNS
+    # RUNS
     # =====================================================
 
     extra_runs = 0
@@ -665,7 +693,32 @@ def add_ball(
         striker.sixes += 1
 
     # =====================================================
-    # WICKET HANDLING
+    # BOWLER STATS
+    # =====================================================
+
+    current_bowler.runs += total_runs
+
+    if wicket:
+        current_bowler.wickets += 1
+
+    if is_legal_ball:
+
+        current_bowler.balls += 1
+
+        overs = (
+            current_bowler.balls // 6
+        )
+
+        balls_rem = (
+            current_bowler.balls % 6
+        )
+
+        current_bowler.overs = (
+            f"{overs}.{balls_rem}"
+        )
+
+    # =====================================================
+    # WICKET
     # =====================================================
 
     if wicket:
@@ -674,20 +727,20 @@ def add_ball(
 
         striker.is_striker = False
 
-        # =============================================
-        # NEXT BATSMAN
-        # =============================================
-
         if next_batsman_id:
 
             existing_batsman = db.query(
                 models.Batsman
             ).filter(
-                models.Batsman.innings_id == innings.id,
-                models.Batsman.player_id == next_batsman_id
+                models.Batsman.innings_id
+                == innings.id,
+
+                models.Batsman.player_id
+                == next_batsman_id
             ).first()
 
             if existing_batsman:
+
                 raise HTTPException(
                     400,
                     "Batsman already used"
@@ -703,7 +756,7 @@ def add_ball(
                     "Next batsman not found"
                 )
 
-            new_batter = models.Batsman(
+            db.add(models.Batsman(
                 id=generate_uuid(),
 
                 match_id=match.id,
@@ -717,15 +770,13 @@ def add_ball(
                 name=p.name,
 
                 is_striker=True
-            )
-
-            db.add(new_batter)
-
-    # =====================================================
-    # STRIKE ROTATION
-    # =====================================================
+            ))
 
     else:
+
+        # =================================================
+        # STRIKE CHANGE
+        # =================================================
 
         if runs % 2 == 1:
 
@@ -734,7 +785,7 @@ def add_ball(
             non_striker.is_striker = True
 
     # =====================================================
-    # OVER END STRIKE CHANGE
+    # OVER COMPLETE STRIKE CHANGE
     # =====================================================
 
     next_legal_balls = legal_balls + (
@@ -743,7 +794,9 @@ def add_ball(
 
     if next_legal_balls % 6 == 0:
 
-        striker.is_striker = not striker.is_striker
+        striker.is_striker = (
+            not striker.is_striker
+        )
 
         non_striker.is_striker = (
             not non_striker.is_striker
@@ -763,96 +816,6 @@ def add_ball(
     innings.wickets = score["wickets"]
 
     innings.overs = score["overs"]
-
-    # =====================================================
-    # AUTO MATCH COMPLETE
-    # =====================================================
-
-    if innings.innings_no == 2:
-
-        target = innings.target or 0
-
-        if innings.runs >= target:
-
-            from app.matches.result_service import (
-                complete_match
-            )
-
-            complete_match(
-                match,
-                innings
-            )
-
-            db.commit()
-
-            return {
-                "message": "Match completed",
-                "result": match.result,
-                "winner_team_id":
-                    match.winner_team_id
-            }
-
-    # =====================================================
-    # ALL OUT
-    # =====================================================
-
-    if innings.wickets >= 10:
-
-        if innings.innings_no == 1:
-
-            innings.status = "completed"
-
-        else:
-
-            from app.matches import (
-                complete_match
-            )
-
-            complete_match(
-                match,
-                innings
-            )
-
-            db.commit()
-
-            return {
-                "message": "Match completed",
-                "result": match.result
-            }
-
-    # =====================================================
-    # OVERS COMPLETE
-    # =====================================================
-
-    overs_split = innings.overs.split(".")
-
-    completed_overs = int(
-        overs_split[0]
-    )
-
-    if completed_overs >= match.total_overs:
-
-        if innings.innings_no == 1:
-
-            innings.status = "completed"
-
-        else:
-
-            from app.matches.result_service import (
-                complete_match
-            )
-
-            complete_match(
-                match,
-                innings
-            )
-
-            db.commit()
-
-            return {
-                "message": "Match completed",
-                "result": match.result
-            }
 
     # =====================================================
     # SAVE
