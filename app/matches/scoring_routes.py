@@ -303,7 +303,6 @@ def start_match(
         body: dict,
         db: Session = Depends(get_db)
 ):
-
     ########################################################
     # MATCH
     ########################################################
@@ -484,13 +483,13 @@ def start_match(
         "innings_id": innings.id
     }
 
+
 @router.post("/{match_id}/ball")
 def add_ball(
         match_id: str,
         body: dict,
         db: Session = Depends(get_db)
 ):
-
     # =====================================================
     # BODY
     # =====================================================
@@ -621,7 +620,7 @@ def add_ball(
     is_legbye = extra_type == "legbye"
 
     is_legal_ball = not (
-        is_wide or is_no_ball
+            is_wide or is_no_ball
     )
 
     # =====================================================
@@ -696,21 +695,26 @@ def add_ball(
     # BOWLER STATS
     # =====================================================
 
-    current_bowler.runs += total_runs
+    current_bowler.runs = (
+                                  current_bowler.runs or 0
+                          ) + total_runs
 
     if wicket:
-        current_bowler.wickets += 1
+        current_bowler.wickets = (
+                                         current_bowler.wickets or 0
+                                 ) + 1
 
     if is_legal_ball:
-
-        current_bowler.balls += 1
+        current_bowler.balls = (
+                                       current_bowler.balls or 0
+                               ) + 1
 
         overs = (
-            current_bowler.balls // 6
+                current_bowler.balls // 6
         )
 
         balls_rem = (
-            current_bowler.balls % 6
+                current_bowler.balls % 6
         )
 
         current_bowler.overs = (
@@ -740,7 +744,6 @@ def add_ball(
             ).first()
 
             if existing_batsman:
-
                 raise HTTPException(
                     400,
                     "Batsman already used"
@@ -779,7 +782,6 @@ def add_ball(
         # =================================================
 
         if runs % 2 == 1:
-
             striker.is_striker = False
 
             non_striker.is_striker = True
@@ -793,7 +795,6 @@ def add_ball(
     )
 
     if next_legal_balls % 6 == 0:
-
         striker.is_striker = (
             not striker.is_striker
         )
@@ -861,6 +862,7 @@ def add_ball(
             "wicket": wicket
         }
     }
+
 
 @router.post("/{match_id}/end_innings")
 def end_innings(
