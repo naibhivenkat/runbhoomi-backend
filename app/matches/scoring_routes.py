@@ -958,16 +958,16 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
 
         # Determine batting team name for second innings
         chasing_team_name = (
-            match.team_b.name
+            match.team_a
             if second_innings.batting_team_id == match.team_b_id
-            else match.team_a.name
+            else match.team_a
         )
 
         # Determine defending team name for first innings
         defending_team_name = (
-            match.team_a.name
+            match.team_a
             if first_innings.batting_team_id == match.team_a_id
-            else match.team_b.name
+            else match.team_b
         )
 
         if second_runs > first_runs:
