@@ -1314,6 +1314,8 @@ def get_match(
     }
 
 
+
+
 @router.get("/user/{email}")
 def get_matches_by_user(
         email: str,
@@ -1322,7 +1324,6 @@ def get_matches_by_user(
     ########################################################
     # FIND PLAYER
     ########################################################
-
     player = db.query(models.Player).filter(
         models.Player.email == email
     ).first()
@@ -1331,25 +1332,90 @@ def get_matches_by_user(
         return []
 
     ########################################################
-    # FIND MATCHES
+    # LOAD ALL MATCHES (DESCENDING)
     ########################################################
-
-    matches = db.query(models.Match).filter(
-        (
-                models.Match.admin_id == player.id
-        )
-    ).order_by(
+    all_matches = db.query(models.Match).order_by(
         models.Match.created_at.desc()
     ).all()
 
     ########################################################
-    # RESPONSE
+    # FILTER RELEVANT MATCHES
     ########################################################
+    matches = []
 
+    for match in all_matches:
+        include = False
+
+        # -----------------------------------------------
+        # 1. USER IS MATCH ADMIN / SCORER
+        # -----------------------------------------------
+        if match.admin_id == player.id:
+            include = True
+
+        # -----------------------------------------------
+        # 2. USER CREATED THE TOURNAMENT
+        # -----------------------------------------------
+        if (
+            not include and
+            match.tournament_id
+        ):
+            tournament = db.query(models.Tournament).filter(
+                models.Tournament.id == match.tournament_id
+            ).first()
+
+            if (
+                tournament and
+                tournament.created_by == player.id
+            ):
+                include = True
+
+        # -----------------------------------------------
+        # 3. USER IS TOURNAMENT USER
+        # -----------------------------------------------
+        if (
+            not include and
+            match.tournament_id
+        ):
+            tournament_user = db.query(
+                models.TournamentUser
+            ).filter(
+                models.TournamentUser.tournament_id
+                == match.tournament_id,
+                models.TournamentUser.user_id
+                == player.id
+            ).first()
+
+            if tournament_user:
+                include = True
+
+        # -----------------------------------------------
+        # 4. USER IS TOURNAMENT OFFICIAL
+        # -----------------------------------------------
+        if (
+            not include and
+            match.tournament_id
+        ):
+            official = db.query(
+                models.TournamentOfficial
+            ).filter(
+                models.TournamentOfficial.tournament_id
+                == match.tournament_id,
+                models.TournamentOfficial.user_id
+                == player.id
+            ).first()
+
+            if official:
+                include = True
+
+        if include:
+            matches.append(match)
+
+    ########################################################
+    # BUILD RESPONSE
+    ########################################################
     data = []
 
     for match in matches:
-
         innings = db.query(models.MatchInnings).filter(
             models.MatchInnings.match_id == match.id
         ).order_by(
@@ -1364,20 +1430,20 @@ def get_matches_by_user(
                 "runs": inn.runs,
                 "wickets": inn.wickets,
                 "overs": inn.overs,
-                "target": inn.target
+                "target": inn.target,
             })
+
+        # Tournament fixture winner (for completed matches)
+        fixture = db.query(models.TournamentMatch).filter(
+            models.TournamentMatch.match_id == match.id
+        ).first()
 
         data.append({
             "id": match.id,
-
             "status": match.status,
-
             "target": match.target,
-
             "max_overs": match.total_overs,
-
-            "current_innings":
-                match.current_innings,
+            "current_innings": match.current_innings,
 
             "teamA":
                 match.teamA.name
@@ -1387,20 +1453,115 @@ def get_matches_by_user(
                 match.teamB.name
                 if match.teamB else "Team B",
 
-            "teamA_id":
-                match.team_a_id,
+            "teamA_id": match.team_a_id,
+            "teamB_id": match.team_b_id,
 
-            "teamB_id":
-                match.team_b_id,
+            "innings": innings_data,
 
-            "innings":
-                innings_data,
+            "created_at": match.created_at,
 
-            "created_at":
-                match.created_at,
+            # 🔥 CRITICAL FIELDS FOR HOME DASHBOARD
+            "result": match.result,
+            "winner":
+                fixture.winner
+                if fixture else None,
+            "note": match.note,
 
-            "is_admin":
-                match.admin_id == player.id
+            # Permissions
+            "is_admin": match.admin_id == player.id,
         })
 
     return data
+
+
+
+# @router.get("/user/{email}")
+# def get_matches_by_user(
+#         email: str,
+#         db: Session = Depends(get_db)
+# ):
+#     ########################################################
+#     # FIND PLAYER
+#     ########################################################
+#
+#     player = db.query(models.Player).filter(
+#         models.Player.email == email
+#     ).first()
+#
+#     if not player:
+#         return []
+#
+#     ########################################################
+#     # FIND MATCHES
+#     ########################################################
+#
+#     matches = db.query(models.Match).filter(
+#         (
+#                 models.Match.admin_id == player.id
+#         )
+#     ).order_by(
+#         models.Match.created_at.desc()
+#     ).all()
+#
+#     ########################################################
+#     # RESPONSE
+#     ########################################################
+#
+#     data = []
+#
+#     for match in matches:
+#
+#         innings = db.query(models.MatchInnings).filter(
+#             models.MatchInnings.match_id == match.id
+#         ).order_by(
+#             models.MatchInnings.innings_no.asc()
+#         ).all()
+#
+#         innings_data = []
+#
+#         for inn in innings:
+#             innings_data.append({
+#                 "innings_no": inn.innings_no,
+#                 "runs": inn.runs,
+#                 "wickets": inn.wickets,
+#                 "overs": inn.overs,
+#                 "target": inn.target
+#             })
+#
+#         data.append({
+#             "id": match.id,
+#
+#             "status": match.status,
+#
+#             "target": match.target,
+#
+#             "max_overs": match.total_overs,
+#
+#             "current_innings":
+#                 match.current_innings,
+#
+#             "teamA":
+#                 match.teamA.name
+#                 if match.teamA else "Team A",
+#
+#             "teamB":
+#                 match.teamB.name
+#                 if match.teamB else "Team B",
+#
+#             "teamA_id":
+#                 match.team_a_id,
+#
+#             "teamB_id":
+#                 match.team_b_id,
+#
+#             "innings":
+#                 innings_data,
+#
+#             "created_at":
+#                 match.created_at,
+#
+#             "is_admin":
+#                 match.admin_id == player.id
+#         })
+#
+#     return data
