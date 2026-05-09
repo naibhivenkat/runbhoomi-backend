@@ -1058,26 +1058,19 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
         second_runs = second_innings.runs or 0
         second_wickets = second_innings.wickets or 0
 
-        # Team names
-        team_a_name = getattr(
-            match,
-            "teamA",
-            None
-        ) or getattr(
-            match,
-            "team_a",
-            None
-        ) or "Team A"
 
-        team_b_name = getattr(
-            match,
-            "teamB",
-            None
-        ) or getattr(
-            match,
-            "team_b",
-            None
-        ) or "Team B"
+        # Team names (extract actual string names)
+        team_a_name = (
+            match.teamA.name
+            if getattr(match, "teamA", None)
+            else "Team A"
+        )
+
+        team_b_name = (
+            match.teamB.name
+            if getattr(match, "teamB", None)
+            else "Team B"
+        )
 
         # Chasing team (batting in innings 2)
         chasing_team_name = (
@@ -1133,6 +1126,14 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
     # Optional winner field
     if hasattr(match, "winner"):
         match.winner = winner_name
+
+    # Update linked tournament fixture winner
+    fixture = db.query(models.TournamentMatch).filter(
+        models.TournamentMatch.match_id == match.id
+    ).first()
+
+    if fixture:
+        fixture.winner = winner_name
 
     db.commit()
     db.refresh(match)
