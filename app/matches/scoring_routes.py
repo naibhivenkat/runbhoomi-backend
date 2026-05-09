@@ -895,3 +895,169 @@ def end_innings(
     return {
         "message": "Match completed"
     }
+
+
+@router.post("/{match_id}/start_second_innings")
+def start_second_innings(
+        match_id: str,
+        body: dict,
+        db: Session = Depends(get_db)
+):
+    """
+    Initialize striker, non-striker and bowler for innings 2.
+
+    This endpoint must be called immediately after the user selects
+    the two opening batters and the opening bowler for the chase.
+    """
+
+    ########################################################
+    # MATCH
+    ########################################################
+
+    match = resolve_match(db, match_id)
+
+    ########################################################
+    # CURRENT INNINGS (should be innings 2 and live)
+    ########################################################
+
+    innings = get_current_innings(db, match.id)
+
+    if innings.innings_no != 2:
+        raise HTTPException(
+            400,
+            "Second innings not available"
+        )
+
+    ########################################################
+    # BODY
+    ########################################################
+
+    striker_id = body.get("striker_id")
+    non_striker_id = body.get("non_striker_id")
+    bowler_id = body.get("bowler_id")
+
+    ########################################################
+    # VALIDATION
+    ########################################################
+
+    if not striker_id:
+        raise HTTPException(400, "striker_id required")
+
+    if not non_striker_id:
+        raise HTTPException(400, "non_striker_id required")
+
+    if not bowler_id:
+        raise HTTPException(400, "bowler_id required")
+
+    if striker_id == non_striker_id:
+        raise HTTPException(
+            400,
+            "Striker and non-striker must be different"
+        )
+
+    ########################################################
+    # ALREADY INITIALIZED?
+    ########################################################
+
+    existing_batsmen = db.query(models.Batsman).filter(
+        models.Batsman.innings_id == innings.id
+    ).count()
+
+    if existing_batsmen >= 2:
+        return {
+            "success": True,
+            "message": "Second innings already initialized",
+            "innings_id": innings.id
+        }
+
+    ########################################################
+    # PLAYERS
+    ########################################################
+
+    striker = db.query(models.Player).get(striker_id)
+    non_striker = db.query(models.Player).get(non_striker_id)
+    bowler = db.query(models.Player).get(bowler_id)
+
+    if not striker:
+        raise HTTPException(404, "Striker not found")
+
+    if not non_striker:
+        raise HTTPException(404, "Non-striker not found")
+
+    if not bowler:
+        raise HTTPException(404, "Bowler not found")
+
+    ########################################################
+    # CREATE OPENING BATSMEN
+    ########################################################
+
+    db.add(models.Batsman(
+        id=generate_uuid(),
+        match_id=match.id,
+        innings_id=innings.id,
+        player_id=striker.id,
+        team_id=innings.batting_team_id,
+        name=striker.name,
+        is_striker=True,
+        is_out=False,
+        runs=0,
+        balls=0,
+        fours=0,
+        sixes=0
+    ))
+
+    db.add(models.Batsman(
+        id=generate_uuid(),
+        match_id=match.id,
+        innings_id=innings.id,
+        player_id=non_striker.id,
+        team_id=innings.batting_team_id,
+        name=non_striker.name,
+        is_striker=False,
+        is_out=False,
+        runs=0,
+        balls=0,
+        fours=0,
+        sixes=0
+    ))
+
+    ########################################################
+    # CREATE OPENING BOWLER
+    ########################################################
+
+    existing_bowler = db.query(models.Bowler).filter(
+        models.Bowler.innings_id == innings.id,
+        models.Bowler.player_id == bowler.id
+    ).first()
+
+    if not existing_bowler:
+        db.add(models.Bowler(
+            id=generate_uuid(),
+            match_id=match.id,
+            innings_id=innings.id,
+            player_id=bowler.id,
+            team_id=innings.bowling_team_id,
+            name=bowler.name,
+            overs="0.0",
+            balls=0,
+            runs=0,
+            wickets=0
+        ))
+
+    ########################################################
+    # SAVE
+    ########################################################
+
+    db.commit()
+
+    ########################################################
+    # RESPONSE
+    ########################################################
+
+    return {
+        "success": True,
+        "message": "Second innings initialized successfully",
+        "innings_id": innings.id,
+        "target": innings.target
+    }
+
