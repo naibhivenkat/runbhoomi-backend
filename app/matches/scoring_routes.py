@@ -897,10 +897,102 @@ def end_innings(
     }
 
 
+# @router.post("/{match_id}/end_match")
+# def end_match(match_id: str, db: Session = Depends(get_db)):
+#     # -------------------------------
+#     # 🔥 RESOLVE MATCH OR FIXTURE ID
+#     # -------------------------------
+#     match = db.query(models.Match).filter(
+#         models.Match.id == match_id
+#     ).first()
+#
+#     if not match:
+#         fixture = db.query(models.TournamentMatch).filter(
+#             models.TournamentMatch.id == match_id
+#         ).first()
+#
+#         if fixture and fixture.match_id:
+#             match = db.query(models.Match).filter(
+#                 models.Match.id == fixture.match_id
+#             ).first()
+#
+#     if not match:
+#         raise HTTPException(status_code=404, detail="Match not found")
+#
+#     # -------------------------------
+#     # 🔥 CALCULATE FINAL SCORE
+#     # -------------------------------
+#     balls = db.query(models.Ball).filter(
+#         models.Ball.match_id == match.id
+#     ).all()
+#
+#     total_runs = sum(
+#         (b.runs or 0) + (b.extra_runs or 0)
+#         for b in balls
+#     )
+#
+#     wickets = sum(
+#         1 for b in balls if b.is_wicket
+#     )
+#
+#     # -------------------------------
+#     # 🔥 MATCH RESULT LOGIC
+#     # -------------------------------
+#
+#     result = "Match tied"
+#
+#     # Get innings
+#     innings_list = db.query(models.MatchInnings).filter(
+#         models.MatchInnings.match_id == match.id
+#     ).order_by(
+#         models.MatchInnings.innings_no
+#     ).all()
+#
+#     if len(innings_list) >= 2:
+#         first_innings = innings_list[0]
+#         second_innings = innings_list[1]
+#
+#         first_runs = first_innings.runs or 0
+#         second_runs = second_innings.runs or 0
+#         second_wickets = second_innings.wickets or 0
+#
+#         # Determine batting team name for second innings
+#         chasing_team_name = (
+#             match.teamA
+#             if second_innings.batting_team_id == match.team_b_id
+#             else match.teamA
+#         )
+#
+#         # Determine defending team name for first innings
+#         defending_team_name = (
+#             match.teamA
+#             if first_innings.batting_team_id == match.team_a_id
+#             else match.teamB
+#         )
+#
+#         if second_runs > first_runs:
+#             wickets_remaining = 10 - second_wickets
+#             result = (
+#                 f"{chasing_team_name} won by "
+#                 f"{wickets_remaining} wicket"
+#                 f"{'' if wickets_remaining == 1 else 's'}"
+#             )
+#
+#         elif second_runs < first_runs:
+#             runs_margin = first_runs - second_runs
+#             result = (
+#                 f"{defending_team_name} won by "
+#                 f"{runs_margin} run"
+#                 f"{'' if runs_margin == 1 else 's'}"
+#             )
+#
+#         else:
+#             result = "Match tied"
+
 @router.post("/{match_id}/end_match")
 def end_match(match_id: str, db: Session = Depends(get_db)):
     # -------------------------------
-    # 🔥 RESOLVE MATCH OR FIXTURE ID
+    # RESOLVE MATCH OR FIXTURE ID
     # -------------------------------
     match = db.query(models.Match).filter(
         models.Match.id == match_id
@@ -917,10 +1009,13 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
             ).first()
 
     if not match:
-        raise HTTPException(status_code=404, detail="Match not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Match not found"
+        )
 
     # -------------------------------
-    # 🔥 CALCULATE FINAL SCORE
+    # CALCULATE FINAL SCORE
     # -------------------------------
     balls = db.query(models.Ball).filter(
         models.Ball.match_id == match.id
@@ -936,18 +1031,25 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
     )
 
     # -------------------------------
-    # 🔥 MATCH RESULT LOGIC
+    # DEFAULT RESULT
     # -------------------------------
-
     result = "Match tied"
+    winner_name = None
 
-    # Get innings
-    innings_list = db.query(models.MatchInnings).filter(
+    # -------------------------------
+    # LOAD INNINGS
+    # -------------------------------
+    innings_list = db.query(
+        models.MatchInnings
+    ).filter(
         models.MatchInnings.match_id == match.id
     ).order_by(
         models.MatchInnings.innings_no
     ).all()
 
+    # -------------------------------
+    # RESULT LOGIC
+    # -------------------------------
     if len(innings_list) >= 2:
         first_innings = innings_list[0]
         second_innings = innings_list[1]
@@ -956,39 +1058,95 @@ def end_match(match_id: str, db: Session = Depends(get_db)):
         second_runs = second_innings.runs or 0
         second_wickets = second_innings.wickets or 0
 
-        # Determine batting team name for second innings
+        # Team names
+        team_a_name = getattr(
+            match,
+            "teamA",
+            None
+        ) or getattr(
+            match,
+            "team_a",
+            None
+        ) or "Team A"
+
+        team_b_name = getattr(
+            match,
+            "teamB",
+            None
+        ) or getattr(
+            match,
+            "team_b",
+            None
+        ) or "Team B"
+
+        # Chasing team (batting in innings 2)
         chasing_team_name = (
-            match.teamA
-            if second_innings.batting_team_id == match.team_b_id
-            else match.teamA
+            team_a_name
+            if second_innings.batting_team_id
+            == match.team_a_id
+            else team_b_name
         )
 
-        # Determine defending team name for first innings
+        # Defending team (batting in innings 1)
         defending_team_name = (
-            match.teamA
-            if first_innings.batting_team_id == match.team_a_id
-            else match.teamB
+            team_a_name
+            if first_innings.batting_team_id
+            == match.team_a_id
+            else team_b_name
         )
 
+        # Chase successful
         if second_runs > first_runs:
             wickets_remaining = 10 - second_wickets
+
             result = (
                 f"{chasing_team_name} won by "
                 f"{wickets_remaining} wicket"
                 f"{'' if wickets_remaining == 1 else 's'}"
             )
 
+            winner_name = chasing_team_name
+
+        # Defending team wins
         elif second_runs < first_runs:
             runs_margin = first_runs - second_runs
+
             result = (
                 f"{defending_team_name} won by "
                 f"{runs_margin} run"
                 f"{'' if runs_margin == 1 else 's'}"
             )
 
+            winner_name = defending_team_name
+
+        # Tie
         else:
             result = "Match tied"
 
+    # -------------------------------
+    # UPDATE MATCH
+    # -------------------------------
+    match.status = "completed"
+    match.final_score = f"{total_runs}/{wickets}"
+    match.result = result
+
+    # Optional winner field
+    if hasattr(match, "winner"):
+        match.winner = winner_name
+
+    db.commit()
+    db.refresh(match)
+
+    # -------------------------------
+    # RESPONSE
+    # -------------------------------
+    return {
+        "message": "Match completed",
+        "final_score": match.final_score,
+        "result": result,
+        "winner": winner_name,
+        "status": match.status,
+    }
 
 @router.post("/{match_id}/start_second_innings")
 def start_second_innings(
