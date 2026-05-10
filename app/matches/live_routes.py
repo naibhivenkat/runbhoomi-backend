@@ -204,9 +204,9 @@ def _calculate_result_text(db: Session, match):
                 return value.strip()
 
     innings_list = (
-        db.query(models.Innings)
-        .filter(models.Innings.match_id == match.id)
-        .order_by(models.Innings.innings_no.asc())
+        db.query(models.MatchInnings)
+        .filter(models.MatchInnings.match_id == match.id)
+        .order_by(models.MatchInnings.innings_no.asc())
         .all()
     )
 
@@ -397,9 +397,9 @@ def completed_matches(db: Session = Depends(get_db)):
 
     for match in matches:
         innings_list = (
-            db.query(models.Innings)
-            .filter(models.Innings.match_id == match.id)
-            .order_by(models.Innings.innings_no.asc())
+            db.query(models.MatchInnings)
+            .filter(models.MatchInnings.match_id == match.id)
+            .order_by(models.MatchInnings.innings_no.asc())
             .all()
         )
 
