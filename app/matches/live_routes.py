@@ -627,6 +627,153 @@ def _serialize_batsmen(db: Session, innings):
     ]
 
 
+def _serialize_current_bowler(db: Session, innings):
+    """
+    Returns current bowler statistics using your existing Bowler model.
+    Compatible with your models.py where:
+      - model = models.Bowler
+      - stats are stored in bowlers table
+      - innings has no current_bowler_id field
+    """
+    if not innings:
+        return None
+
+    # Get latest bowler record for this innings.
+    # Prefer the bowler with most balls bowled, then latest updated row.
+    bowler = (
+        db.query(models.Bowler)
+        .filter(models.Bowler.innings_id == innings.id)
+        .order_by(
+            models.Bowler.balls.desc(),
+            models.Bowler.overs.desc(),
+            models.Bowler.runs.asc()
+        )
+        .first()
+    )
+
+    if not bowler:
+        return None
+
+    # Resolve player name
+    player = None
+    if getattr(bowler, "player_id", None):
+        player = (
+            db.query(models.Player)
+            .filter(models.Player.id == bowler.player_id)
+            .first()
+        )
+
+    # Name priority:
+    # Player.name -> Bowler.name -> Unknown Bowler
+    name = (
+        _safe_player_name(player)
+        if player
+        else (getattr(bowler, "name", None) or "Unknown Bowler")
+    )
+
+    # Read stored values
+    overs = getattr(bowler, "overs", "0.0") or "0.0"
+    maidens = getattr(bowler, "maidens", 0) or 0
+    runs = getattr(bowler, "runs", 0) or 0
+    wickets = getattr(bowler, "wickets", 0) or 0
+
+    # Use stored economy if available, otherwise calculate from balls
+    stored_economy = getattr(bowler, "economy", None)
+
+    if stored_economy is not None:
+        try:
+            economy = float(stored_economy)
+        except Exception:
+            economy = 0.0
+    else:
+        total_balls = getattr(bowler, "balls", 0) or 0
+        if total_balls > 0:
+            economy = round((runs * 6) / total_balls, 1)
+        else:
+            economy = 0.0
+
+    return {
+        "name": name,
+        "overs": str(overs),
+        "maidens": maidens,
+        "runs": runs,
+        "wickets": wickets,
+        "economy": f"{economy:.1f}",
+    }
+
+
+def _get_last_over(db: Session, innings):
+    """
+    Returns last up to 6 balls using your existing Ball model.
+
+    Examples:
+        ["1", "4", "0", "W", "6"]
+        ["Wd", "1", "4", "W", "Nb", "6"]
+    """
+    if not innings:
+        return []
+
+    balls = (
+        db.query(models.Ball)
+        .filter(models.Ball.innings_id == innings.id)
+        .order_by(
+            models.Ball.created_at.desc(),
+            models.Ball.over.desc(),
+            models.Ball.ball.desc()
+        )
+        .limit(6)
+        .all()
+    )
+
+    if not balls:
+        return []
+
+    # Show in chronological order (oldest -> newest)
+    balls = list(reversed(balls))
+
+    result = []
+
+    for ball in balls:
+        # Wicket takes priority
+        if getattr(ball, "is_wicket", False):
+            result.append("W")
+            continue
+
+        extra_type = getattr(ball, "extra_type", None)
+        extra_runs = getattr(ball, "extra_runs", 0) or 0
+        runs = getattr(ball, "runs", 0) or 0
+
+        # Wide
+        if extra_type and str(extra_type).upper() in ["WD", "WIDE"]:
+            label = "Wd"
+            if extra_runs > 1:
+                label = f"Wd{extra_runs}"
+            result.append(label)
+            continue
+
+        # No Ball
+        if extra_type and str(extra_type).upper() in ["NB", "NOBALL", "NO_BALL"]:
+            if runs > 0:
+                result.append(f"Nb+{runs}")
+            else:
+                result.append("Nb")
+            continue
+
+        # Bye / Leg Bye
+        if extra_type and str(extra_type).upper() in ["B", "BYE"]:
+            result.append(f"B{extra_runs}" if extra_runs > 0 else "B")
+            continue
+
+        if extra_type and str(extra_type).upper() in ["LB", "LEG_BYE", "LEGBYE"]:
+            result.append(f"LB{extra_runs}" if extra_runs > 0 else "LB")
+            continue
+
+        # Normal delivery
+        total = runs + extra_runs
+        result.append(str(total))
+
+    return result
+
 # ===================================================================
 # LIVE SCORE
 # ===================================================================
@@ -674,6 +821,40 @@ def live_score(
     wickets = getattr(innings, "wickets", 0) or 0
     overs = getattr(innings, "overs", "0.0")
 
+    # return {
+    #     "match_id": str(match.id),
+    #     "status": "live",
+    #
+    #     # Teams
+    #     "team1": _safe_team_name(team1),
+    #     "team2": _safe_team_name(team2),
+    #
+    #     # Score
+    #     "score": _format_score(runs, wickets),
+    #     "overs": overs,
+    #     "max_overs": max_overs,
+    #
+    #     # Professional score format
+    #     "display_score": _format_score_with_overs(
+    #         runs,
+    #         wickets,
+    #         overs,
+    #         max_overs,
+    #     ),
+    #
+    #     # Additional
+    #     "target": getattr(innings, "target", None),
+    #     "innings": getattr(innings, "innings_no", 1),
+    #
+    #     # Proper subtitle:
+    #     # "RCB elected to Bat"
+    #     # or "Target: 156 runs"
+    #     "subtitle": _get_match_status_text(match, innings),
+    #
+    #     # Live batsmen
+    #     "batsmen": _serialize_batsmen(db, innings),
+    # }
+
     return {
         "match_id": str(match.id),
         "status": "live",
@@ -683,29 +864,35 @@ def live_score(
         "team2": _safe_team_name(team2),
 
         # Score
-        "score": _format_score(runs, wickets),
-        "overs": overs,
-        "max_overs": max_overs,
+        "score": _format_score(runs, wickets),  # e.g. "7/0"
+        "overs": overs,  # e.g. "0.2"
+        "max_overs": max_overs,  # e.g. 1
 
-        # Professional score format
+        # Professional display score
         "display_score": _format_score_with_overs(
             runs,
             wickets,
             overs,
             max_overs,
-        ),
+        ),  # e.g. "7/0 (0.2/1)"
 
-        # Additional
+        # Match metadata
         "target": getattr(innings, "target", None),
         "innings": getattr(innings, "innings_no", 1),
 
-        # Proper subtitle:
-        # "RCB elected to Bat"
-        # or "Target: 156 runs"
+        # Status subtitle
+        # 1st innings: "SRH elected to Bat"
+        # 2nd innings: "Target: 156 runs"
         "subtitle": _get_match_status_text(match, innings),
 
-        # Live batsmen
+        # Live batting table
         "batsmen": _serialize_batsmen(db, innings),
+
+        # Current bowler card
+        "bowler": _serialize_current_bowler(db, innings),
+
+        # Recent balls section
+        "last_over": _get_last_over(db, innings),
     }
 
 
