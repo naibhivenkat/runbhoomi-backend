@@ -1017,7 +1017,7 @@ class TournamentUser(Base):
         default="PLAYER"
     )
 
-    tournament = relationship("Tournament")
+    tournament = relationship("Tournament", back_populates="matches")
 
     user = relationship("Player")
 
