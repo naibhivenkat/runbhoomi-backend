@@ -88,57 +88,96 @@ class RoleUpdate(BaseModel):
     role: str
 
 
+# @router.post("/create")
+# def create_tournament(
+#         data: dict,
+#         db: Session = Depends(get_db),
+#         user_id: str = Depends(get_current_user_id)
+# ):
+#     tournament = models.Tournament(
+#         name=data.get("name"),
+#         city=data.get("city"),
+#         ground=data.get("ground"),
+#
+#         organizer_name=data.get("organizer_name"),
+#         organizer_phone=data.get("organizer_phone"),
+#         organizer_email=data.get("organizer_email"),
+#
+#         start_date=data.get("start_date"),
+#         end_date=data.get("end_date"),
+#
+#         category=data.get("category"),
+#         ball_type=data.get("ball_type"),
+#         pitch_type=data.get("pitch_type"),
+#         match_type=data.get("match_type"),
+#
+#         total_teams=data.get("total_teams"),
+#         format=data.get("format"),
+#         overs=data.get("overs"),
+#
+#         logo_url=data.get("logo_url"),
+#         banner_url=data.get("banner_url"),
+#
+#         created_by=user_id
+#     )
+#
+#     db.add(tournament)
+#     db.commit()
+#     db.refresh(tournament)
+#
+#     # ADMIN ENTRY
+#     admin_entry = TournamentUser(
+#         tournament_id=tournament.id,
+#         user_id=user_id,
+#         role="ADMIN"
+#     )
+#     db.add(admin_entry)
+#     db.commit()
+#
+#     return {
+#         "message": "Tournament created",
+#         "tournament_id": tournament.id
+#     }
+
+
 @router.post("/create")
 def create_tournament(
         data: dict,
         db: Session = Depends(get_db),
         user_id: str = Depends(get_current_user_id)
 ):
-    tournament = models.Tournament(
-        name=data.get("name"),
-        city=data.get("city"),
-        ground=data.get("ground"),
+    try:
+        new_tournament = models.Tournament(
+            name=data.get("name"),
+            # Location Integration
+            city=data.get("city"),
+            ground=data.get("ground"),
+            address=data.get("address"),
+            latitude=data.get("latitude"),
+            longitude=data.get("longitude"),
+            # Metadata
+            organizer_name=data.get("organizer_name"),
+            organizer_phone=data.get("organizer_phone"),
+            organizer_email=data.get("organizer_email"),
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
+            category=data.get("category"),
+            ball_type=data.get("ball_type"),
+            pitch_type=data.get("pitch_type"),
+            match_type=data.get("match_type"),
+            total_teams=data.get("total_teams"),
+            format=data.get("format", "league"),
+            overs=data.get("overs", 6),
+            created_by=user_id
+        )
 
-        organizer_name=data.get("organizer_name"),
-        organizer_phone=data.get("organizer_phone"),
-        organizer_email=data.get("organizer_email"),
-
-        start_date=data.get("start_date"),
-        end_date=data.get("end_date"),
-
-        category=data.get("category"),
-        ball_type=data.get("ball_type"),
-        pitch_type=data.get("pitch_type"),
-        match_type=data.get("match_type"),
-
-        total_teams=data.get("total_teams"),
-        format=data.get("format"),
-        overs=data.get("overs"),
-
-        logo_url=data.get("logo_url"),
-        banner_url=data.get("banner_url"),
-
-        created_by=user_id
-    )
-
-    db.add(tournament)
-    db.commit()
-    db.refresh(tournament)
-
-    # ADMIN ENTRY
-    admin_entry = TournamentUser(
-        tournament_id=tournament.id,
-        user_id=user_id,
-        role="ADMIN"
-    )
-    db.add(admin_entry)
-    db.commit()
-
-    return {
-        "message": "Tournament created",
-        "tournament_id": tournament.id
-    }
-
+        db.add(new_tournament)
+        db.commit()
+        db.refresh(new_tournament)
+        return new_tournament
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{tournament_id}/rename")
 def rename_tournament(
@@ -878,6 +917,7 @@ def add_team_to_tournament(
         "tournament_id": tournament_id
     }
 
+
 @router.post("/{tournament_id}/join")
 def join_tournament(
         tournament_id: str,
@@ -1074,37 +1114,7 @@ def next_round(tournament_id: str, db: Session = Depends(get_db)):
     return {"message": "Next round created"}
 
 
-# @router.get("/{tournament_id}/matches")
-# def get_matches(tournament_id: str, db: Session = Depends(get_db)):
-#     matches = db.query(TournamentMatch).filter_by(
-#         tournament_id=tournament_id
-#     ).all()
-#
-#     result = []
-#
-#     for m in matches:
-#         teamA = db.query(Team).get(m.team_a_id) if m.team_a_id else None
-#         teamB = db.query(Team).get(m.team_b_id) if m.team_b_id else None
-#
-#         result.append({
-#             "id": m.id,
-#             "team_a_id": m.team_a_id,
-#             "team_b_id": m.team_b_id,
-#
-#             "team_a": teamA.name if teamA else "TBD",
-#             "team_b": teamB.name if teamB else "TBD",
-#
-#             "match_type": m.match_type,
-#             "winner": m.winner,
-#
-#             "group_id": m.group_id,
-#             "match_time": m.match_time,
-#
-#             "is_live": False,
-#             "match_id": m.match_id,
-#         })
-#
-#     return result
+
 
 
 @router.get("/{tournament_id}/matches")
