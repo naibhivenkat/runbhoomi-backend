@@ -681,72 +681,7 @@ class Ball(Base):
     )
 
 
-# =========================================================
-# TOURNAMENT
-# =========================================================
 
-# class Tournament(Base):
-#     __tablename__ = "tournaments"
-#
-#     id = Column(
-#         String,
-#         primary_key=True,
-#         default=generate_uuid
-#     )
-#
-#     name = Column(String, nullable=False)
-#
-#     created_by = Column(
-#         String,
-#         ForeignKey("players.id")
-#     )
-#
-#     city = Column(String)
-#
-#     ground = Column(String)
-#
-#     organizer_name = Column(String)
-#
-#     organizer_phone = Column(String)
-#
-#     organizer_email = Column(String)
-#
-#     start_date = Column(String)
-#
-#     end_date = Column(String)
-#
-#     category = Column(String)
-#
-#     ball_type = Column(String)
-#
-#     pitch_type = Column(String)
-#
-#     match_type = Column(String)
-#
-#     total_teams = Column(Integer)
-#
-#     logo_url = Column(String)
-#
-#     banner_url = Column(String)
-#
-#     format = Column(String, default="league")
-#
-#     overs = Column(Integer, default=6)
-#
-#     created_at = Column(
-#         DateTime,
-#         default=datetime.utcnow
-#     )
-#
-#     teams = relationship(
-#         "TournamentTeam",
-#         back_populates="tournament"
-#     )
-#
-
-# =========================================================
-# TOURNAMENT TEAM
-# =========================================================
 
 class Tournament(Base):
     __tablename__ = "tournaments"
@@ -755,25 +690,23 @@ class Tournament(Base):
     name = Column(String, nullable=False)
     created_by = Column(String, ForeignKey("players.id"))
 
-    # --- Professional Location Fields (CricHeroes Style) ---
-    city = Column(String)  # e.g., "Mumbai"
-    ground = Column(String)  # e.g., "Wankhede Stadium"
-    address = Column(String)  # Full Formatted Address from Google Maps
-    latitude = Column(Float)  # For "Directions" and Map view
-    longitude = Column(Float)  # For "Directions" and Map view
+    city = Column(String)
+    ground = Column(String)
+    address = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
 
-    # --- Tournament Metadata ---
     organizer_name = Column(String)
     organizer_phone = Column(String)
     organizer_email = Column(String)
-    start_date = Column(String)  # ISO String
-    end_date = Column(String)  # ISO String
-    category = Column(String)  # Local, Corporate, Open, etc.
-    ball_type = Column(String)  # Tennis, Leather
-    pitch_type = Column(String)  # Turf, Matting, Concrete
-    match_type = Column(String)  # T20, Limited Overs, etc.
+    start_date = Column(String)
+    end_date = Column(String)
+    category = Column(String)
+    ball_type = Column(String)
+    pitch_type = Column(String)
+    match_type = Column(String)
     total_teams = Column(Integer)
-    format = Column(String, default="league")  # league, knockout, hybrid
+    format = Column(String, default="league")
     overs = Column(Integer, default=6)
 
     logo_url = Column(String)
@@ -781,8 +714,18 @@ class Tournament(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    teams = relationship("TournamentTeam", back_populates="tournament", cascade="all, delete-orphan")
-    matches = relationship("TournamentMatch", back_populates="tournament")
+    teams = relationship(
+        "TournamentTeam",
+        back_populates="tournament",
+        cascade="all, delete-orphan"
+    )
+
+    matches = relationship(
+        "TournamentMatch",
+        back_populates="tournament",
+        cascade="all, delete-orphan"
+    )
+
 
 class TournamentTeam(Base):
     __tablename__ = "tournament_teams"
@@ -839,16 +782,19 @@ class TournamentMatch(Base):
 
     tournament_id = Column(
         String,
-        ForeignKey("tournaments.id")
+        ForeignKey("tournaments.id"),
+        nullable=False
     )
 
     team_a = Column(String)
-
     team_b = Column(String)
 
     match_date = Column(String)
 
-    winner = Column(String, nullable=True)
+    winner = Column(
+        String,
+        nullable=True
+    )
 
     match_id = Column(
         String,
@@ -857,19 +803,39 @@ class TournamentMatch(Base):
     )
 
     team_a_id = Column(String)
-
     team_b_id = Column(String)
 
-    group_id = Column(String, nullable=True)
+    group_id = Column(
+        String,
+        nullable=True
+    )
 
     match_type = Column(
         String,
         default="league"
     )
 
-    round = Column(Integer, default=1)
+    round = Column(
+        Integer,
+        default=1
+    )
 
-    match_time = Column(String, nullable=True)
+    match_time = Column(
+        String,
+        nullable=True
+    )
+
+    # -------------------------------------------------
+    # RELATIONSHIPS (REQUIRED)
+    # -------------------------------------------------
+    tournament = relationship(
+        "Tournament",
+        back_populates="matches"
+    )
+
+    match = relationship(
+        "Match"
+    )
 
 
 # =========================================================
@@ -993,6 +959,10 @@ class TeamInvite(Base):
 # TOURNAMENT USER
 # =========================================================
 
+# =========================================================
+# TOURNAMENT USER
+# =========================================================
+
 class TournamentUser(Base):
     __tablename__ = "tournament_users"
 
@@ -1004,12 +974,14 @@ class TournamentUser(Base):
 
     tournament_id = Column(
         String,
-        ForeignKey("tournaments.id")
+        ForeignKey("tournaments.id"),
+        nullable=False
     )
 
     user_id = Column(
         String,
-        ForeignKey("players.id")
+        ForeignKey("players.id"),
+        nullable=False
     )
 
     role = Column(
@@ -1017,10 +989,9 @@ class TournamentUser(Base):
         default="PLAYER"
     )
 
-    tournament = relationship("Tournament", back_populates="matches")
+    tournament = relationship("Tournament")
 
     user = relationship("Player")
-
 
 # =========================================================
 # USER
