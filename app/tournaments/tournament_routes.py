@@ -17,7 +17,7 @@ from app.tournaments.group_service import create_groups, generate_knockout, pair
     get_match_duration
 from app.utls.permissions import require_admin
 
-router = APIRouter(prefix="/tournaments")
+router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 
 
 class JoinRequestPayload(BaseModel):
@@ -147,6 +147,9 @@ def create_tournament(
         user_id: str = Depends(get_current_user_id)
 ):
     try:
+        # Check if incoming request dictionary explicitly holds an ID from Flutter
+        incoming_id = data.get("id")
+
         new_tournament = models.Tournament(
             name=data.get("name"),
             # Location Integration
@@ -171,10 +174,15 @@ def create_tournament(
             created_by=user_id
         )
 
+        # FIX 1: If Flutter supplied an ID, preserve it so Isar and Postgres stay synced
+        if incoming_id:
+            new_tournament.id = incoming_id
+
         db.add(new_tournament)
         db.commit()
         db.refresh(new_tournament)
         return new_tournament
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
