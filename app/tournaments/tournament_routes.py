@@ -20,6 +20,9 @@ from app.utls.permissions import require_admin
 router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 
 
+class AdminAssignmentPayload(BaseModel):
+    player_id: str
+
 class JoinRequestPayload(BaseModel):
     tournament_id: str
     team_name: str
@@ -88,127 +91,180 @@ class RoleUpdate(BaseModel):
     role: str
 
 
+
+
 # @router.post("/create")
 # def create_tournament(
 #         data: dict,
 #         db: Session = Depends(get_db),
 #         user_id: str = Depends(get_current_user_id)
 # ):
-#     tournament = models.Tournament(
-#         name=data.get("name"),
-#         city=data.get("city"),
-#         ground=data.get("ground"),
+#     try:
+#         # Check if incoming request dictionary explicitly holds an ID from Flutter
+#         incoming_id = data.get("id")
 #
-#         organizer_name=data.get("organizer_name"),
-#         organizer_phone=data.get("organizer_phone"),
-#         organizer_email=data.get("organizer_email"),
+#         new_tournament = models.Tournament(
+#             name=data.get("name"),
+#             # Location Integration
+#             city=data.get("city"),
+#             ground=data.get("ground"),
+#             address=data.get("address"),
+#             latitude=data.get("latitude"),
+#             longitude=data.get("longitude"),
+#             # Metadata
+#             organizer_name=data.get("organizer_name"),
+#             organizer_phone=data.get("organizer_phone"),
+#             organizer_email=data.get("organizer_email"),
+#             start_date=data.get("start_date"),
+#             end_date=data.get("end_date"),
+#             category=data.get("category"),
+#             ball_type=data.get("ball_type"),
+#             pitch_type=data.get("pitch_type"),
+#             match_type=data.get("match_type"),
+#             total_teams=data.get("total_teams"),
+#             format=data.get("format", "league"),
+#             overs=data.get("overs", 6),
+#             created_by=user_id
+#         )
 #
-#         start_date=data.get("start_date"),
-#         end_date=data.get("end_date"),
+#         # FIX 1: If Flutter supplied an ID, preserve it so Isar and Postgres stay synced
+#         if incoming_id:
+#             new_tournament.id = incoming_id
 #
-#         category=data.get("category"),
-#         ball_type=data.get("ball_type"),
-#         pitch_type=data.get("pitch_type"),
-#         match_type=data.get("match_type"),
+#         db.add(new_tournament)
+#         db.commit()
+#         db.refresh(new_tournament)
+#         return new_tournament
 #
-#         total_teams=data.get("total_teams"),
-#         format=data.get("format"),
-#         overs=data.get("overs"),
-#
-#         logo_url=data.get("logo_url"),
-#         banner_url=data.get("banner_url"),
-#
-#         created_by=user_id
-#     )
-#
-#     db.add(tournament)
-#     db.commit()
-#     db.refresh(tournament)
-#
-#     # ADMIN ENTRY
-#     admin_entry = TournamentUser(
-#         tournament_id=tournament.id,
-#         user_id=user_id,
-#         role="ADMIN"
-#     )
-#     db.add(admin_entry)
-#     db.commit()
-#
-#     return {
-#         "message": "Tournament created",
-#         "tournament_id": tournament.id
-#     }
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/create")
 def create_tournament(
-        data: dict,
-        db: Session = Depends(get_db),
-        user_id: str = Depends(get_current_user_id)
+    payload: TournamentCreate,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user_id)
 ):
     try:
-        # Check if incoming request dictionary explicitly holds an ID from Flutter
-        incoming_id = data.get("id")
-
         new_tournament = models.Tournament(
-            name=data.get("name"),
-            # Location Integration
-            city=data.get("city"),
-            ground=data.get("ground"),
-            address=data.get("address"),
-            latitude=data.get("latitude"),
-            longitude=data.get("longitude"),
-            # Metadata
-            organizer_name=data.get("organizer_name"),
-            organizer_phone=data.get("organizer_phone"),
-            organizer_email=data.get("organizer_email"),
-            start_date=data.get("start_date"),
-            end_date=data.get("end_date"),
-            category=data.get("category"),
-            ball_type=data.get("ball_type"),
-            pitch_type=data.get("pitch_type"),
-            match_type=data.get("match_type"),
-            total_teams=data.get("total_teams"),
-            format=data.get("format", "league"),
-            overs=data.get("overs", 6),
-            created_by=user_id
+            name=payload.name,
+            city=payload.city,
+            ground=payload.ground,
+            address=payload.address,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            organizer_name=payload.organizer_name,
+            organizer_phone=payload.organizer_phone,
+            organizer_email=payload.organizer_email,
+            start_date=payload.start_date,
+            end_date=payload.end_date,
+            category=payload.category,
+            ball_type=payload.ball_type,
+            pitch_type=payload.pitch_type,
+            match_type=payload.match_type,
+            total_teams=payload.total_teams,
+            format=payload.format,
+            overs=payload.overs,
+            created_by=user_id  # Binds creator as the permanent default Super Admin
         )
 
-        # FIX 1: If Flutter supplied an ID, preserve it so Isar and Postgres stay synced
-        if incoming_id:
-            new_tournament.id = incoming_id
+        # Preserve the offline-generated UUID from Flutter to avoid synchronization drift
+        if payload.id:
+            new_tournament.id = payload.id
 
         db.add(new_tournament)
         db.commit()
         db.refresh(new_tournament)
         return new_tournament
-
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{tournament_id}/admins/add")
+def add_tournament_co_admin(
+        tournament_id: str,
+        payload: AdminAssignmentPayload,
+        db: Session = Depends(get_db),
+        current_user_id: str = Depends(get_current_user_id)
+):
+    """Allows the main tournament creator to add Co-Admins to delegate setup tasks."""
+    tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament container not found")
+
+    # Security rule: Only the original Super Admin owner can manage access allocations
+    if tournament.created_by != current_user_id:
+        raise HTTPException(status_code=403, detail="Only the primary creator can add co-admins")
+
+    # Confirm player exists in database registry entries
+    player = db.query(models.Player).filter(models.Player.id == payload.player_id).first()
+    if not player:
+        raise HTTPException(status_code=404, detail="Target player profile not found")
+
+    # Prevent duplicate entry generation arrays
+    already_admin = db.query(models.TournamentAdmin).filter(
+        models.TournamentAdmin.tournament_id == tournament_id,
+        models.TournamentAdmin.player_id == payload.player_id
+    ).first()
+
+    if already_admin or tournament.created_by == payload.player_id:
+        return {"message": "User already holds administrative privileges"}
+
+    new_admin = models.TournamentAdmin(
+        tournament_id=tournament_id,
+        player_id=payload.player_id
+    )
+    db.add(new_admin)
+    db.commit()
+    return {"message": f"Successfully registered {player.name} as tournament Co-Admin"}
+
+
+@router.delete("/{tournament_id}/admins/{player_id}")
+def remove_tournament_co_admin(
+        tournament_id: str,
+        player_id: str,
+        db: Session = Depends(get_db),
+        current_user_id: str = Depends(get_current_user_id)
+):
+    """Allows the creator to revoke administrative permissions from a Co-Admin."""
+    tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament container not found")
+
+    if tournament.created_by != current_user_id:
+        raise HTTPException(status_code=403, detail="Only the primary creator can revoke administrative rights")
+
+    admin_link = db.query(models.TournamentAdmin).filter(
+        models.TournamentAdmin.tournament_id == tournament_id,
+        models.TournamentAdmin.player_id == player_id
+    ).first()
+
+    if not admin_link:
+        raise HTTPException(status_code=404, detail="Co-admin target linkage not found")
+
+    db.delete(admin_link)
+    db.commit()
+    return {"message": "Administrative access revoked successfully"}
+
 
 @router.put("/{tournament_id}/rename")
 def rename_tournament(
         tournament_id: str,
         payload: RenameTournamentPayload,
         db: Session = Depends(get_db),
-        user_id: str = Depends(get_current_user_id)
+        current_user_id: str = Depends(get_current_user_id)
 ):
-    # Find the tournament
+    # 🔒 SECURE: Enforce co-admin verification check instantly
+    check_tournament_admin_privileges(tournament_id, current_user_id, db)
+
     tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
-
-    if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-
-    # Security check: Ensure the user trying to rename is the admin (if your schema supports this)
-    # if tournament.admin_id != user_id:
-    #     raise HTTPException(status_code=403, detail="Not authorized to edit this tournament")
-
-    # Update the name and commit
     tournament.name = payload.new_name
     db.commit()
-
-    return {"status": "success", "message": f"Tournament renamed to {tournament.name}"}
+    db.refresh(tournament)
+    return tournament
 
 
 # ==========================================
@@ -219,35 +275,20 @@ def rename_tournament(
 def delete_tournament(
         tournament_id: str,
         db: Session = Depends(get_db),
-        user_id: str = Depends(get_current_user_id)
+        current_user_id: str = Depends(get_current_user_id)
 ):
-    # Find the tournament
     tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
-
     if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
+        raise HTTPException(status_code=404, detail="Tournament container not found")
 
-    try:
-        # 🔥 STEP 1: DELETE CHILD RECORDS FIRST TO PREVENT FOREIGN KEY ERRORS 🔥
+    # 🔒 Owner check remains strict here: co-admins can't delete the entire tournament container!
+    if tournament.created_by != current_user_id:
+        raise HTTPException(status_code=403,
+                            detail="Destructive Error: Only the primary creator can delete this tournament.")
 
-        # 1. Delete from tournament_users (This caused your crash!)
-        db.query(models.TournamentUser).filter(models.TournamentUser.tournament_id == tournament_id).delete()
-
-        # 2. Delete linked teams (Adjust 'models.TournamentTeam' to whatever you named your link table)
-        db.query(models.TournamentTeam).filter(models.TournamentTeam.tournament_id == tournament_id).delete()
-
-        # 3. Delete linked matches (If you have a Match model)
-        db.query(models.Match).filter(models.Match.tournament_id == tournament_id).delete()
-
-        # 🔥 STEP 2: NOW IT IS SAFE TO DELETE THE TOURNAMENT
-        db.delete(tournament)
-        db.commit()
-
-        return {"status": "success", "message": "Tournament successfully deleted"}
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    db.delete(tournament)
+    db.commit()
+    return {"message": "Tournament context permanently removed from registry"}
 
 
 @router.post("/matches/{tm_id}/init")
@@ -1579,5 +1620,31 @@ def remove_player_from_team(
     db.delete(player_entry)
     db.commit()
     return {"message": "Player removed successfully"}
+
+
+def check_tournament_admin_privileges(tournament_id: str, current_user_id: str, db: Session):
+    """
+    CricHeroes Authorization Logic:
+    Validates if the requesting user is either the original Super Admin creator
+    or an explicitly designated Co-Admin via the relationship table.
+    """
+    tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament container not found")
+
+    # Check if the player exists in the explicit tournament_admins mapping table
+    is_co_admin = db.query(models.TournamentAdmin).filter(
+        models.TournamentAdmin.tournament_id == tournament_id,
+        models.TournamentAdmin.player_id == current_user_id
+    ).first()
+
+    # Deny access if they aren't the original owner and aren't in the co-admins list
+    if tournament.created_by != current_user_id and not is_co_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Access Denied: You do not possess administrative rights for this tournament."
+        )
+
+    return tournament
 
 

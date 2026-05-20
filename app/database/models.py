@@ -680,14 +680,25 @@ class Ball(Base):
         back_populates="balls"
     )
 
+class TournamentAdmin(Base):
+    """Bridge table keeping track of explicitly assigned co-admins."""
+    __tablename__ = "tournament_admins"
 
+    id = Column(String, primary_key=True, default=generate_uuid)
+    tournament_id = Column(String, ForeignKey("tournaments.id", ondelete="CASCADE"), nullable=False)
+    player_id = Column(String, ForeignKey("players.id", ondelete="CASCADE"), nullable=False)
+    assigned_at = Column(DateTime, default=datetime.utcnow)
 
+    # Fast references back to main entities
+    player = relationship("Player")
 
 class Tournament(Base):
     __tablename__ = "tournaments"
 
     id = Column(String, primary_key=True, default=generate_uuid)
     name = Column(String, nullable=False)
+
+    # Super Admin/Owner (Cannot be removed or locked out)
     created_by = Column(String, ForeignKey("players.id"))
 
     city = Column(String)
@@ -726,6 +737,11 @@ class Tournament(Base):
         cascade="all, delete-orphan"
     )
 
+    # NEW: Relationship fetching the co-admins list directly
+    co_admins = relationship(
+        "TournamentAdmin",
+        cascade="all, delete-orphan"
+    )
 
 class TournamentTeam(Base):
     __tablename__ = "tournament_teams"
