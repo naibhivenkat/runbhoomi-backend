@@ -95,52 +95,7 @@ class RoleUpdate(BaseModel):
     role: str
 
 
-# @router.post("/create")
-# def create_tournament(
-#         data: dict,
-#         db: Session = Depends(get_db),
-#         user_id: str = Depends(get_current_user_id)
-# ):
-#     try:
-#         # Check if incoming request dictionary explicitly holds an ID from Flutter
-#         incoming_id = data.get("id")
-#
-#         new_tournament = models.Tournament(
-#             name=data.get("name"),
-#             # Location Integration
-#             city=data.get("city"),
-#             ground=data.get("ground"),
-#             address=data.get("address"),
-#             latitude=data.get("latitude"),
-#             longitude=data.get("longitude"),
-#             # Metadata
-#             organizer_name=data.get("organizer_name"),
-#             organizer_phone=data.get("organizer_phone"),
-#             organizer_email=data.get("organizer_email"),
-#             start_date=data.get("start_date"),
-#             end_date=data.get("end_date"),
-#             category=data.get("category"),
-#             ball_type=data.get("ball_type"),
-#             pitch_type=data.get("pitch_type"),
-#             match_type=data.get("match_type"),
-#             total_teams=data.get("total_teams"),
-#             format=data.get("format", "league"),
-#             overs=data.get("overs", 6),
-#             created_by=user_id
-#         )
-#
-#         # FIX 1: If Flutter supplied an ID, preserve it so Isar and Postgres stay synced
-#         if incoming_id:
-#             new_tournament.id = incoming_id
-#
-#         db.add(new_tournament)
-#         db.commit()
-#         db.refresh(new_tournament)
-#         return new_tournament
-#
-#     except Exception as e:
-#         db.rollback()
-#         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.post("/create")

@@ -718,7 +718,8 @@ class Tournament(Base):
     match_type = Column(String)
     total_teams = Column(Integer)
     format = Column(String, default="league")
-    overs = Column(Integer, default=6)
+    overs = Column(Integer, default=0)
+
 
     logo_url = Column(String)
     banner_url = Column(String)
