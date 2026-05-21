@@ -39,13 +39,18 @@ class RenameTeamPayload(BaseModel):
 
 
 class TournamentCreate(BaseModel):
+    id: Optional[str] = None
     name: str
     city: str
     ground: str
+    address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
-    organizer_name: str
-    organizer_phone: str
-    organizer_email: str
+    # Make these optional so the API doesn't crash if they are missing
+    organizer_name: Optional[str] = None
+    organizer_phone: Optional[str] = None
+    organizer_email: Optional[str] = None
 
     start_date: str
     end_date: str
@@ -56,7 +61,6 @@ class TournamentCreate(BaseModel):
     match_type: str
 
     total_teams: int
-
     format: str = "league"
     overs: int = 20
 
