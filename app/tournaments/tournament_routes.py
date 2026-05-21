@@ -353,18 +353,45 @@ def rename_team(
 def get_tournaments(db: Session = Depends(get_db)):
     tournaments = db.query(models.Tournament).all()
 
+    # return [
+    #     {
+    #         "id": t.id,
+    #         "name": t.name,
+    #         "city": t.city,
+    #         "ground": t.ground,
+    #         "match_type": t.match_type,
+    #         "total_teams": t.total_teams,
+    #         "start_date": t.start_date,
+    #         "end_date": t.end_date,
+    #         "banner_url": getattr(t, "banner_url", None),
+    #         "logo_url": getattr(t, "logo_url", None),
+    #         "created_by": t.created_by
+    #     }
+    #     for t in tournaments
+    # ]
     return [
         {
             "id": t.id,
             "name": t.name,
             "city": t.city,
             "ground": t.ground,
+            "address": t.address,
+            "latitude": t.latitude,
+            "longitude": t.longitude,
+
             "match_type": t.match_type,
+
             "total_teams": t.total_teams,
+
+            "format": t.format,
+            "overs": t.overs,
+
             "start_date": t.start_date,
             "end_date": t.end_date,
+
             "banner_url": getattr(t, "banner_url", None),
             "logo_url": getattr(t, "logo_url", None),
+
             "created_by": t.created_by
         }
         for t in tournaments
@@ -1608,9 +1635,45 @@ def get_tournament_details(
         raise HTTPException(status_code=404, detail="Tournament not found")
 
     # Return the tournament data including the co-admins relationship
+    # return {
+    #     "id": tournament.id,
+    #     "name": tournament.name,
+    #     "created_by": tournament.created_by,
+    #     "co_admins": [{"player": {"id": ca.player.id, "name": ca.player.name}} for ca in tournament.co_admins]
+    # }
     return {
         "id": tournament.id,
         "name": tournament.name,
+
+        "city": tournament.city,
+        "ground": tournament.ground,
+        "address": tournament.address,
+
+        "latitude": tournament.latitude,
+        "longitude": tournament.longitude,
+
+        "match_type": tournament.match_type,
+
+        "total_teams": tournament.total_teams,
+
+        "format": tournament.format,
+        "overs": tournament.overs,
+
+        "start_date": tournament.start_date,
+        "end_date": tournament.end_date,
+
+        "banner_url": tournament.banner_url,
+        "logo_url": tournament.logo_url,
+
         "created_by": tournament.created_by,
-        "co_admins": [{"player": {"id": ca.player.id, "name": ca.player.name}} for ca in tournament.co_admins]
+
+        "co_admins": [
+            {
+                "player": {
+                    "id": ca.player.id,
+                    "name": ca.player.name
+                }
+            }
+            for ca in tournament.co_admins
+        ]
     }
