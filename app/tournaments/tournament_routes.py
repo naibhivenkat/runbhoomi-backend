@@ -5,7 +5,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import Query
 from pydantic import BaseModel
-from sqlalchemy import cast, Time
 from sqlalchemy.orm import Session
 
 from app.auth.deps import get_current_user_id
@@ -22,6 +21,7 @@ router = APIRouter(prefix="/tournaments", tags=["Tournaments"])
 
 class AdminAssignmentPayload(BaseModel):
     player_id: str
+
 
 class JoinRequestPayload(BaseModel):
     tournament_id: str
@@ -95,8 +95,6 @@ class RoleUpdate(BaseModel):
     role: str
 
 
-
-
 # @router.post("/create")
 # def create_tournament(
 #         data: dict,
@@ -147,9 +145,9 @@ class RoleUpdate(BaseModel):
 
 @router.post("/create")
 def create_tournament(
-    payload: TournamentCreate,
-    db: Session = Depends(get_db),
-    user_id: str = Depends(get_current_user_id)
+        payload: TournamentCreate,
+        db: Session = Depends(get_db),
+        user_id: str = Depends(get_current_user_id)
 ):
     try:
         new_tournament = models.Tournament(
@@ -418,8 +416,6 @@ def get_tournaments(db: Session = Depends(get_db)):
     ]
 
 
-
-
 @router.post("/{tournament_id}/generate_fixtures")
 def generate_fixtures(
         tournament_id: str,
@@ -519,6 +515,7 @@ def generate_fixtures(
                 )
 
                 db.add(tm)
+
             # First Round (A vs B)
             for a, b in fixtures:
                 create_match_entry(a, b, 1)
@@ -555,6 +552,7 @@ def generate_fixtures(
 
     db.commit()
     return {"message": f"Fixtures created. Total matches: {len(order)}"}
+
 
 @router.get("/{tournament_id}/points")
 def get_points(tournament_id: str, db: Session = Depends(get_db)):
@@ -688,12 +686,12 @@ def delete_upcoming_fixtures(
         "deleted_fixtures": deleted_count
     }
 
+
 @router.get("/{tournament_id}/teams")
 def get_teams(
-    tournament_id: str,
-    db: Session = Depends(get_db)
+        tournament_id: str,
+        db: Session = Depends(get_db)
 ):
-
     ########################################################
     # TOURNAMENT TEAMS
     ########################################################
@@ -755,7 +753,6 @@ def get_teams(
         ).first()
 
         if not existing:
-
             db.add(
                 TournamentPoints(
                     id=generate_uuid(),
@@ -797,12 +794,12 @@ def get_teams(
 
     return result
 
+
 @router.delete("/teams/{team_id}")
 def delete_team(
-    team_id: str,
-    db: Session = Depends(get_db)
+        team_id: str,
+        db: Session = Depends(get_db)
 ):
-
     ####################################################
     # REMOVE TOURNAMENT LINKS
     ####################################################
@@ -853,7 +850,6 @@ def delete_team(
     ).count()
 
     if remaining == 0:
-
         db.query(Team).filter(
             Team.id == team_id
         ).delete(synchronize_session=False)
@@ -868,11 +864,10 @@ def delete_team(
 
 @router.post("/{tournament_id}/teams")
 def add_team_to_tournament(
-    tournament_id: str,
-    body: dict,
-    db: Session = Depends(get_db)
+        tournament_id: str,
+        body: dict,
+        db: Session = Depends(get_db)
 ):
-
     ########################################################
     # VALIDATE
     ########################################################
@@ -1167,13 +1162,10 @@ def next_round(tournament_id: str, db: Session = Depends(get_db)):
     return {"message": "Next round created"}
 
 
-
-
-
 @router.get("/{tournament_id}/matches")
 def get_matches(
-    tournament_id: str,
-    db: Session = Depends(get_db)
+        tournament_id: str,
+        db: Session = Depends(get_db)
 ):
     ########################################################
     # LOAD TOURNAMENT FIXTURES
@@ -1261,6 +1253,7 @@ def get_matches(
     # RETURN ALL FIXTURES
     ########################################################
     return result
+
 
 @router.post("/teams/{team_id}/invite")
 def create_invite(team_id: str, db: Session = Depends(get_db)):
@@ -1508,8 +1501,6 @@ async def remove_tournament_official(
     return {"message": "Official removed successfully", "status": "success"}
 
 
-
-
 @router.patch("/teams/{team_id}/players/{player_id}/details")
 def update_player_details(
         team_id: str,
@@ -1652,3 +1643,19 @@ def check_tournament_admin_privileges(tournament_id: str, current_user_id: str, 
     return tournament
 
 
+@router.get("/{tournament_id}")
+def get_tournament_details(
+        tournament_id: str,
+        db: Session = Depends(get_db)
+):
+    tournament = db.query(models.Tournament).filter(models.Tournament.id == tournament_id).first()
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+
+    # Return the tournament data including the co-admins relationship
+    return {
+        "id": tournament.id,
+        "name": tournament.name,
+        "created_by": tournament.created_by,
+        "co_admins": [{"player": {"id": ca.player.id, "name": ca.player.name}} for ca in tournament.co_admins]
+    }
